@@ -36,9 +36,6 @@ import java.util.List;
 
 public class RestaurantApp extends Application {
 
-    public static final String URL = "jdbc:postgresql://localhost:5432/paparaci2";
-    public static final String USERNAME = "postgres";
-    public static final String PASSWORD = "postgres";
     private static String ime="";
     TextField tableField = new TextField();
     TextField passwordField = new TextField();
@@ -175,7 +172,7 @@ public class RestaurantApp extends Application {
     private void handleTableEntry(String tableNumber, String ps) {
         if (tableNumber.isEmpty()) return;
 
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+        try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement("SELECT * FROM vraboten WHERE shifra = ? and active = true"))
         {
             stmt.setInt(1, Integer.parseInt(ps));
@@ -190,7 +187,7 @@ public class RestaurantApp extends Application {
         }
     }
     private void getTabels() {
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+        try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement("select v.ime,masa,shifra from naracka as n\n" +
                      "inner join vraboten as v on v.shifra=n.vrabotenshifra;")) {
             try (ResultSet rs = stmt.executeQuery()) {
@@ -557,7 +554,7 @@ public class RestaurantApp extends Application {
                     } catch (SQLException e) {
                         throw new RuntimeException(e);
                     }
-                    try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
+                    try (Connection conn = DatabaseConnection.getConnection()) {
                         String insertIzbrihaniQuery = "INSERT INTO Izbrihani (Masa, VrabotenShifra) VALUES (?, ?)";
                         try (PreparedStatement stmt = conn.prepareStatement(insertIzbrihaniQuery, Statement.RETURN_GENERATED_KEYS)) {
                             stmt.setInt(1, Integer.parseInt(tn)); // Masa
@@ -810,7 +807,7 @@ public class RestaurantApp extends Application {
         String query = "SELECT sn.id FROM StavkaNaracka AS sn " +
                 "INNER JOIN Naracka N ON sn.NarackaId = N.Id " +
                 "WHERE VrabotenShifra = ? AND NarackaId = ? AND ArtiklId = ? AND Kolicina = ?";
-        try (   Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+        try (Connection conn = DatabaseConnection.getConnection();
                 PreparedStatement statement = conn.prepareStatement(query)) {
             statement.setInt(1, employeeId);
             statement.setInt(2, narackaId);
@@ -826,7 +823,7 @@ public class RestaurantApp extends Application {
     }
 
     private void createBill(int employeeId,String tn,String tipSmetka,String titleSmetka){
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false); // Start transaction
 
             // Calculate the total price
@@ -944,7 +941,7 @@ public class RestaurantApp extends Application {
 
         } catch (SQLException ex) {
             System.out.println("MiddleSectioin sql exception" + ex);
-            try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
+            try (Connection conn = DatabaseConnection.getConnection()) {
                 conn.rollback();  // Rollback transaction on failure
             } catch (SQLException rollbackEx) {
                 rollbackEx.printStackTrace();
@@ -979,7 +976,7 @@ public class RestaurantApp extends Application {
         WHERE Id = ?;
     """;
 
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);
 
             int existingOrderId = -1;
@@ -1038,7 +1035,7 @@ public class RestaurantApp extends Application {
 
     private void freeTableInDatabase(int tableNumber, int employeeId) throws SQLException {
         String deleteSourceOrderQuery = "DELETE FROM Naracka WHERE Masa = ? AND VrabotenShifra = ?;";
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+        try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(deleteSourceOrderQuery)) {
             stmt.setInt(1, tableNumber);
             stmt.setInt(2, employeeId);
@@ -1049,7 +1046,7 @@ public class RestaurantApp extends Application {
     }
 
     private void transferArticleInDatabase(int articleId, int quantity, int currentOrderId, int targetTable, int employeeId,int snid) throws SQLException {
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false); // Start transaction
 
             int targetOrderId;
@@ -1116,7 +1113,7 @@ public class RestaurantApp extends Application {
 
 
     private void transferOrdersInDatabase(int currentTable, int targetTable, int employeeId) throws SQLException {
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false); // Start transaction
 
             int targetOrderId;
@@ -1312,7 +1309,7 @@ public class RestaurantApp extends Application {
 
     private int getTotalPrice(String tn,int employeeId) {
         int vk_cena = 0;
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+        try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement("""
                      select sum(cena*kolicina) as sum
                      from
@@ -1355,7 +1352,7 @@ public class RestaurantApp extends Application {
     }
 
     private void loadPreviousOrders(String tableNumber, int employeeId) {
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+        try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement("""
                      select a.Id,a.Naziv,a.cena,sn.Kolicina,TO_CHAR(sn.vreme,'HH24:MI:SS') as vreme,sn.id as snid
                      From stavkanaracka sn
@@ -1403,7 +1400,7 @@ public class RestaurantApp extends Application {
     }
 
     private int getOrderIdForSelectedItem(int employeeId, int tableNumber) throws SQLException {
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
+        try (Connection conn = DatabaseConnection.getConnection();) {
             String query = "SELECT n.id FROM StavkaNaracka sn " +
                     "JOIN Naracka n ON sn.NarackaId = n.Id " +
                     "JOIN Artikl a ON sn.ArtiklId = a.Id " +
@@ -1429,7 +1426,7 @@ public class RestaurantApp extends Application {
 
 
     private void deleteOrderFromDatabase(int snid, int orderId) {
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
             // First, delete the specific order item from StavkaNaracka table
             try (PreparedStatement stmt = conn.prepareStatement(
                     "DELETE FROM StavkaNaracka WHERE id = ?")) {
@@ -1457,7 +1454,7 @@ public class RestaurantApp extends Application {
     }
 
     private void saveOrderToDatabase(String tableNumber, int employeeId, int articleId, int quantity) {
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
             int orderId = getOrCreateOrderId(conn, tableNumber, employeeId);
             try (PreparedStatement stmt = conn.prepareStatement(
                     "INSERT INTO StavkaNaracka (NarackaId, ArtiklId, Kolicina, Cena,vreme) VALUES (?, ?, ?, (SELECT Cena FROM Artikl WHERE Id = ?),?)")) {
@@ -1630,7 +1627,7 @@ public class RestaurantApp extends Application {
     }
 
     static boolean checkPassword(String proverka) {
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+        try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement("SELECT * FROM vraboten where active = true");
              ResultSet rs = stmt.executeQuery()) {
 
@@ -1659,7 +1656,7 @@ public class RestaurantApp extends Application {
         });
     }
     private static void ReadArticles() {
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+        try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement("SELECT id, naziv, cena FROM artikl\n" +
                      "order by id;");
              ResultSet rs = stmt.executeQuery()) {
@@ -1942,7 +1939,7 @@ public class RestaurantApp extends Application {
     // Method to fetch employees from the database
     private List<Employee> fetchEmployees() {
         List<Employee> employees = new ArrayList<>();
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+        try (Connection conn = DatabaseConnection.getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT ime, shifra FROM vraboten where active = true")) {
             while (rs.next()) {
@@ -2017,7 +2014,7 @@ public class RestaurantApp extends Application {
             }
 
             // Establish a connection to the database
-            Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+            Connection conn = DatabaseConnection.getConnection();
             PreparedStatement ps = conn.prepareStatement(query);
 
             // Set the common parameters
@@ -2105,7 +2102,7 @@ public class RestaurantApp extends Application {
         """;
 
             // Establish database connection
-            Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+            Connection conn = DatabaseConnection.getConnection();
             PreparedStatement ps = conn.prepareStatement(query);
 
             // Set the common parameters
@@ -2256,7 +2253,7 @@ public class RestaurantApp extends Application {
         """;
 
             // Establish database connection
-            Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+            Connection conn = DatabaseConnection.getConnection();
             PreparedStatement ps = conn.prepareStatement(query);
 
             // Set the common parameters
@@ -2316,7 +2313,7 @@ public class RestaurantApp extends Application {
             """;
 
             // Establish a connection to the database
-            Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+            Connection conn = DatabaseConnection.getConnection();
             PreparedStatement ps = conn.prepareStatement(query);
 
             // Set the parameters for the query
@@ -2394,7 +2391,7 @@ public class RestaurantApp extends Application {
         double invoiceTotal = 0;
         List<String[]> deletedItems = new ArrayList<>();
 
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
             // Query for fiscal
             try (PreparedStatement ps = conn.prepareStatement(query)) {
                 ps.setDate(1, java.sql.Date.valueOf(dateFrom)); // Date from
@@ -2652,6 +2649,7 @@ public class RestaurantApp extends Application {
         return macedonianCharMap;
     }
     public static void main(String[] args) {
+        Runtime.getRuntime().addShutdownHook(new Thread(DatabaseConnection::closePool));
         launch(args);
     }
 }

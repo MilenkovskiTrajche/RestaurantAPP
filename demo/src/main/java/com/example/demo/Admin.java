@@ -1,11 +1,7 @@
 package com.example.demo;
-
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
-
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -18,7 +14,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import java.sql.*;
-import java.util.Map;
 import java.util.Optional;
 import static com.example.demo.RestaurantApp.*;
 
@@ -111,7 +106,7 @@ public class Admin extends Application {
     }
 
     static boolean checkAdmin(String proverka) {
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+        try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement("select tip from Vraboten where Shifra = ?"))
         {
             String tip= "";
@@ -262,7 +257,7 @@ public class Admin extends Application {
     }
 
     private void loadVrabotenList() {
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+        try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement("select * from Vraboten where active = true"))
         {
             ResultSet rs = stmt.executeQuery();
@@ -297,7 +292,7 @@ public class Admin extends Application {
             return;
         }
 
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
             // Check for duplicate shifra
             PreparedStatement checkStmt = conn.prepareStatement("SELECT COUNT(*) FROM Vraboten WHERE shifra = ?");
             checkStmt.setInt(1, shifra);
@@ -337,7 +332,7 @@ public class Admin extends Application {
             return;
         }
 
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
+        try (Connection conn = DatabaseConnection.getConnection();) {
 
             // Step 1: Begin transaction
             conn.setAutoCommit(false);
@@ -399,7 +394,7 @@ public class Admin extends Application {
             return;
         }
 
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
             PreparedStatement stmt = conn.prepareStatement("UPDATE Vraboten SET shifra = ?, ime = ?, tip = ? WHERE shifra = ?");
             stmt.setInt(1,shifra);
             stmt.setString(2, ime_novo);
@@ -567,7 +562,7 @@ public class Admin extends Application {
     // Load articles into the TableView
     private void loadArticleTable(TableView<String[]> articleTable) {
         articleTable.getItems().clear();
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+        try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement("SELECT * FROM Artikl")) {
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) {
@@ -600,7 +595,7 @@ public class Admin extends Application {
             showAlertInformation("Називот не може да биде празен.");
             return;
         }
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
+        try (Connection conn = DatabaseConnection.getConnection();) {
             PreparedStatement stmt = conn.prepareStatement("INSERT INTO Artikl (naziv, cena, ddv, tip) VALUES (?, ?, ?, ?)");
             stmt.setString(1, naziv);
             stmt.setInt(2, cena);
@@ -636,7 +631,7 @@ public class Admin extends Application {
             showAlertError("Називот не може да биде празен.");
             return;
         }
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
+        try (Connection conn = DatabaseConnection.getConnection();) {
             PreparedStatement stmt = conn.prepareStatement("UPDATE Artikl SET naziv = ?, cena = ?, ddv = ?, tip = ? WHERE id = ?");
             stmt.setString(1, naziv);
             stmt.setInt(2, cena);
@@ -653,7 +648,7 @@ public class Admin extends Application {
 
     private void deleteArticle(String [] selectedArticle) {
         int id = Integer.parseInt(selectedArticle[0]);
-        try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
             PreparedStatement stmt = conn.prepareStatement("Delete from artikl WHERE id = ?");
             stmt.setInt(1, id);
 
