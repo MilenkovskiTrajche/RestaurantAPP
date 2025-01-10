@@ -39,12 +39,12 @@ public class RestaurantApp extends Application {
     private static String ime="";
     TextField tableField = new TextField();
     TextField passwordField = new TextField();
-    private static final Set<Map<String, Object>> articls = new HashSet<>();
+    static final Set<Map<String, Object>> articls = new HashSet<>();
     private final Set<String> existingTables = new HashSet<>();
     private final GridPane tableGrid = new GridPane();
     TableView<String[]> orderTable = new TableView<>();
     private final ObservableList<String[]> orderData = FXCollections.observableArrayList();
-    private final ObservableList<String[]> AllData = FXCollections.observableArrayList();
+    public static final ObservableList<String[]> AllData = FXCollections.observableArrayList();
     private final Label totalPriceLabel = new Label("Вкупно: 0");
     private final TextField articleInputField = new TextField();
     private final TextField quantityInputField = new TextField();
@@ -60,7 +60,7 @@ public class RestaurantApp extends Application {
     Button adminfiskalnabtn = new Button("Печати - Фискална");
     Button adminfakturabtn = new Button("Печати - Фактура");
     private final Map<String, List<String[]>> tableOrders = new HashMap<>();
-    private TableView<String[]> tableView;
+    private static TableView<String[]> tableView;
     private final ObservableList<String[]> smetkaData = FXCollections.observableArrayList();
     private final ObservableList<String[]> smetkadataAdmin = FXCollections.observableArrayList();
     private TableView<String[]> leftAdminTable = new TableView<>();
@@ -211,7 +211,7 @@ public class RestaurantApp extends Application {
         }
     }
 
-    private void initialize(String tn, int employeeId) {
+    public void initialize(String tn, int employeeId) {
         articleStage = new Stage();
         orderTable = new TableView<>();
         loadPreviousOrders(tn, employeeId);
@@ -409,7 +409,7 @@ public class RestaurantApp extends Application {
                                 // Check if the input is empty
                                 if (quantityInputField.getText().isEmpty()) {
                                     kolicina = 1; // Set default value
-                                } 
+                                }
                                 if(!quantityInputField.getText().isEmpty()){
                                     // Try parsing the entered text to an integer
                                     kolicina = Integer.parseInt(quantityInputField.getText());
@@ -606,7 +606,7 @@ public class RestaurantApp extends Application {
 
         //Префрли маса button
         transferButton.setAlignment(Pos.CENTER_LEFT);
-        transferButton.setOnAction(event -> {
+        transferButton.setOnAction(_ -> {
             if(AllData.isEmpty()){
                 showAlertInformation("Нема нарачки за да се префрлат!");
                 return;
@@ -642,7 +642,7 @@ public class RestaurantApp extends Application {
 
         //префрли артикл button
         transferArticleButton.setAlignment(Pos.CENTER_LEFT);
-        transferArticleButton.setOnAction(event -> {
+        transferArticleButton.setOnAction(_ -> {
             if (AllData.isEmpty()) {
                 showAlertInformation("Нема нарачки за префрлање!");
                 return;
@@ -718,7 +718,7 @@ public class RestaurantApp extends Application {
         });
 
         Button prefrlikelner = new Button("F10|Префрли келнер");
-        prefrlikelner.setOnAction(event -> {
+        prefrlikelner.setOnAction(_ -> {
             if (AllData.isEmpty()) {
                 showAlertInformation("Нема нарачки за префрлање!");
                 return;
@@ -958,21 +958,21 @@ public class RestaurantApp extends Application {
 
     private void updateVrabotenShifra(int currentVrabotenShifra, int masa, int newVrabotenShifra) {
         String querySelectExistingOrder = """
-        SELECT Id FROM Naracka 
+        SELECT Id FROM Naracka
         WHERE Masa = ? AND VrabotenShifra = ? AND Status = 'active';
     """;
         String queryMergeStavka = """
-        UPDATE StavkaNaracka 
-        SET NarackaId = ? 
+        UPDATE StavkaNaracka
+        SET NarackaId = ?
         WHERE NarackaId = ?;
     """;
         String queryDeleteOrder = """
-        DELETE FROM Naracka 
+        DELETE FROM Naracka
         WHERE Id = ?;
     """;
         String queryUpdateVraboten = """
-        UPDATE Naracka 
-        SET VrabotenShifra = ? 
+        UPDATE Naracka
+        SET VrabotenShifra = ?
         WHERE Id = ?;
     """;
 
@@ -1265,7 +1265,7 @@ public class RestaurantApp extends Application {
     }
 
     // Find article by ID or name
-    private String[] findArticle(String input) {
+    static String[] findArticle(String input) {
         for (Map<String, Object> article : articls) {
             String id = article.get("id").toString();
             String naziv = article.get("naziv").toString();
@@ -1344,7 +1344,7 @@ public class RestaurantApp extends Application {
 
 
     // Show alert if something goes wrong
-    private void showAlert(String message) {
+    static void showAlert(String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle("Error");
         alert.setContentText(message);
@@ -1400,7 +1400,7 @@ public class RestaurantApp extends Application {
     }
 
     private int getOrderIdForSelectedItem(int employeeId, int tableNumber) throws SQLException {
-        try (Connection conn = DatabaseConnection.getConnection();) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
             String query = "SELECT n.id FROM StavkaNaracka sn " +
                     "JOIN Naracka n ON sn.NarackaId = n.Id " +
                     "JOIN Artikl a ON sn.ArtiklId = a.Id " +
@@ -1495,7 +1495,7 @@ public class RestaurantApp extends Application {
         }
     }
 
-    private void updateAvailableArticlesSearch(String searchText) {
+    static void updateAvailableArticlesSearch(String searchText) {
         ObservableList<String[]> filteredArticles = FXCollections.observableArrayList();
 
         for (Map<String, Object> article : articls) {
@@ -1518,7 +1518,7 @@ public class RestaurantApp extends Application {
     }
 
     // Update the available articles table with data from the articls Set
-    private void updateAvailableArticlesTable(TableView<String[]> tableView) {
+    static void updateAvailableArticlesTable(TableView<String[]> tableView) {
         ObservableList<String[]> articles = FXCollections.observableArrayList();
 
         // Loop through the articles and add them to the ObservableList
@@ -1679,8 +1679,6 @@ public class RestaurantApp extends Application {
 
     //ADMIN panel
     public void showAdminPanel() {
-        articleStage = new Stage();
-
         // Create the main SplitPane (Left - Right)
         SplitPane mainSplitPane = new SplitPane();
 
@@ -2558,7 +2556,7 @@ public class RestaurantApp extends Application {
     }
 
     //ALERTS za info
-    private void showAlertInformation(String message) {
+    static void showAlertInformation(String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Информација");
         alert.setContentText(message);

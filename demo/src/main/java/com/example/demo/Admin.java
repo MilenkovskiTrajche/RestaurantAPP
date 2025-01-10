@@ -15,12 +15,16 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import java.sql.*;
 import java.util.Optional;
-import static com.example.demo.RestaurantApp.*;
+
 
 public class Admin extends Application {
     public final ListView<String> vrabotenList = new ListView<>();
     private final ComboBox<String> tipComboBox = new ComboBox<>();
     TableView<String[]> articleTable = new TableView<>();
+    // Buttons for the options
+    public Button addEditEmployeeButton = new Button("Додади/Промени вработен");
+    public Button addEditArticleButton = new Button("Додади/Промени артикл");
+    public Button viewBy = new Button("Прегледи");
 
     @Override
     public void start(Stage primaryStage) {
@@ -47,10 +51,6 @@ public class Admin extends Application {
         );
         passwordField.setTextFormatter(passwordFormatter);
 
-        // Buttons for the options
-        Button addEditEmployeeButton = new Button("Додади/Промени вработен");
-        Button addEditArticleButton = new Button("Додади/Промени артикл");
-        Button viewBy = new Button("Прегледи");
         Button exitButton = new Button("Излези");
 
         // Set common button styling
@@ -168,8 +168,8 @@ public class Admin extends Application {
         imeField.setPrefWidth(100);
         imeField.setMaxWidth(150);
 
+        ComboBox<String> tipComboBox = new ComboBox<>();
         tipComboBox.getItems().addAll("kelner", "admin");
-        tipComboBox.setValue("kelner");
         tipComboBox.setPrefWidth(150);
 
         HBox dugminja = new HBox(10);
@@ -180,6 +180,10 @@ public class Admin extends Application {
         Button saveButton = new Button("Зачувај");
         saveButton.setPrefWidth(100);
         saveButton.setOnAction(_ ->{
+            if(tipComboBox.getItems().isEmpty()){
+                showAlertInformation("Мора да изберите тип на вработен!");
+                return;
+            }
             saveVraboten(shifraField.getText(), imeField.getText(), tipComboBox.getValue());
             vrabotenList.getItems().clear();
             loadVrabotenList();
@@ -194,6 +198,10 @@ public class Admin extends Application {
             String selected = vrabotenList.getSelectionModel().getSelectedItem();
             if(selected != null) {
                 String[] parts = selected.split(" - ");
+                if(tipComboBox.getItems().isEmpty()){
+                    showAlertInformation("Мора да изберите тип на вработен!");
+                    return;
+                }
                 updateVraboten(shifraField.getText(), imeField.getText(), tipComboBox.getValue(),parts[0]);
                 vrabotenList.getItems().clear();
                 loadVrabotenList();
@@ -232,7 +240,13 @@ public class Admin extends Application {
 
         Button exit = new Button("Излези");
         exit.setPrefWidth(100);
-        exit.setOnAction(_ -> primaryStage.close());
+        exit.setOnAction(_ -> {
+            primaryStage.close();
+            // Disable buttons initially
+            addEditEmployeeButton.setDisable(true);
+            addEditArticleButton.setDisable(true);
+            viewBy.setDisable(true);
+        });
 
         dugminja.getChildren().addAll(saveButton,updateButton,deleteButton,exit);
         rightPane.getChildren().addAll(formLabel, shifraLabel, shifraField, imeLabel, imeField, tipComboBox,dugminja);
@@ -525,6 +539,10 @@ public class Admin extends Application {
         exitButton.setOnAction(_ -> {
             primaryStage.close();
             nazivField.clear();cenaField.clear();
+            // Disable buttons initially
+            addEditEmployeeButton.setDisable(true);
+            addEditArticleButton.setDisable(true);
+            viewBy.setDisable(true);
         });
 
         articleTable.setOnMouseClicked(_->{
@@ -659,7 +677,7 @@ public class Admin extends Application {
             showAlertError("Грешка при промена на артикл: " + e.getMessage());
         }
     }
-    private static void showAlertInformation(String message) {
+    static void showAlertInformation(String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Информација");
         alert.setContentText(message);
