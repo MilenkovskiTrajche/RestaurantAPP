@@ -1686,7 +1686,7 @@ public class RestaurantApp extends Application {
         // Create top and bottom sections for the left side
         leftAdminTable = new TableView<>(); // Top part (TableView)
         setupLeftAdminTable();
-        leftAdminTable.setStyle("-fx-font-size: 18px;");
+        leftAdminTable.setStyle("-fx-font-size: 24px;");
 
         VBox leftBottomBox = createBottomSection(); // Bottom part (Form fields and buttons)
 
@@ -1699,7 +1699,7 @@ public class RestaurantApp extends Application {
         // Right side: TableView for displaying the result (takes full height)
         rightAdminResultTable = new TableView<>();// Table to show results
 
-        rightAdminResultTable.setStyle("-fx-font-size: 18px;");
+        rightAdminResultTable.setStyle("-fx-font-size: 24px;");
 
         SplitPane rightSplitPane = new SplitPane();
 
@@ -1739,15 +1739,17 @@ public class RestaurantApp extends Application {
     private void setupLeftAdminTable() {
         // Create columns
         TableColumn<String[], String> imeColumn = new TableColumn<>("Име");
+        imeColumn.setPrefWidth(150);
         TableColumn<String[], String> idColumn = new TableColumn<>("Id");
         TableColumn<String[], String> masaColumn = new TableColumn<>("Маса");
-        masaColumn.setPrefWidth(60);
         TableColumn<String[], String> vkupnoColumn = new TableColumn<>("Вкупно");
+        vkupnoColumn.setPrefWidth(150);
         TableColumn<String[], String> datumColumn = new TableColumn<>("Дата");
-        datumColumn.setPrefWidth(120);
+        datumColumn.setPrefWidth(150);
         TableColumn<String[], String> vremecolumm = new TableColumn<>("Време");
+        vremecolumm.setPrefWidth(150);
         TableColumn<String[], String> tipColumn = new TableColumn<>("Тип");
-        tipColumn.setPrefWidth(100);
+        tipColumn.setPrefWidth(120);
 
         // Set cell value factories to bind the correct column data
         imeColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
@@ -1768,17 +1770,19 @@ public class RestaurantApp extends Application {
         DatePicker dateto  = new DatePicker();
         Label datefromLabel = new Label("Датум од:");
         Label datetoLabel = new Label("до:");
+        datefromLabel.setStyle("-fx-font-size: 14px;");datetoLabel.setStyle("-fx-font-size: 14px;");
         datefrom.setValue(LocalDate.now());dateto.setValue(LocalDate.now());
-        datefrom.setMaxWidth(120);
-        datefrom.setPrefWidth(120);
-        dateto.setMinWidth(120);
-        dateto.setPrefWidth(120);
-        datefrom.setStyle("-fx-font-size:14");dateto.setStyle("-fx-font-size:14");
+        datefrom.setMaxWidth(150);
+        datefrom.setPrefWidth(150);
+        dateto.setMinWidth(150);
+        dateto.setPrefWidth(150);
+        datefrom.setStyle("-fx-font-size:16");dateto.setStyle("-fx-font-size:16");
 
         TextField timeFromField = new TextField();
         TextField timeToField = new TextField();
         Label timefromlabel = new Label("Време од:");
         Label timetolabel = new Label("до:");
+        timefromlabel.setStyle("-fx-font-size: 14px");timetolabel.setStyle("-fx-font-size: 14px");
         timeToField.setMaxWidth(60);
         timeToField.setPrefWidth(60);
         timeFromField.setMinWidth(60);
@@ -1788,7 +1792,7 @@ public class RestaurantApp extends Application {
 
         timeFromField.setText(vremeod);
         timeToField.setText(vremedo);
-        timeToField.setStyle("-fx-font-size:14");timeFromField.setStyle("-fx-font-size:14");
+        timeToField.setStyle("-fx-font-size:16");timeFromField.setStyle("-fx-font-size:16");
         setMaxInputLength(timeToField,5);setMaxInputLength(timeFromField,5);
         validateTimeInput(timeFromField);validateTimeInput(timeToField);//min pomali od 60 sat pomal od 24
 
@@ -1798,6 +1802,7 @@ public class RestaurantApp extends Application {
 
         // "шифра вработен" ComboBox
         Label vraboten = new Label("Вработен");
+        vraboten.setStyle("-fx-font-size: 14");
         ComboBox<Employee> vrabotenComboBox = new ComboBox<>();
         vrabotenComboBox.setMaxWidth(150);
 
@@ -1806,29 +1811,30 @@ public class RestaurantApp extends Application {
         vrabotenComboBox.getItems().addFirst(alloptions);
         vrabotenComboBox.getItems().addAll(employees);
         vrabotenComboBox.setValue(alloptions);
-        vrabotenComboBox.setStyle("-fx-font-size:14");
+        vrabotenComboBox.setStyle("-fx-font-size:16");
 
         Button prikaziButton = new Button("Прикажи");
         Button pregledVrabotenButton = new Button("Преглед по вработен");
         Button pregledArikliliButton = new Button("Преглед по артикли");
 
-        prikaziButton.setStyle("-fx-font-size:14");pregledVrabotenButton.setStyle("-fx-font-size:14");pregledArikliliButton.setStyle("-fx-font-size:14");
+        prikaziButton.setStyle("-fx-font-size:16");pregledVrabotenButton.setStyle("-fx-font-size:16");pregledArikliliButton.setStyle("-fx-font-size:16");
         // Layout for the action buttons
         HBox vrabotenartikli = new HBox(10,vraboten,vrabotenComboBox,prikaziButton, pregledVrabotenButton, pregledArikliliButton);
         vrabotenartikli.setAlignment(Pos.CENTER_LEFT);
         vrabotenartikli.setPadding(new Insets(10));
 
         Button pregledSmetkiButton = new Button("Преглед по сметки");
-        pregledSmetkiButton.setStyle("-fx-font-size:14");
+        pregledSmetkiButton.setStyle("-fx-font-size:16");
         // Dropdown for "тип на сметка"
         Label tipsmetka = new Label("Тип на сметка:");
+        tipsmetka.setStyle("-fx-font-size:14");
         ComboBox<String> tipSmetkaComboBox = new ComboBox<>();
         tipSmetkaComboBox.getItems().addAll("Сите", "фискална", "фактура");
         tipSmetkaComboBox.setValue("Сите");
-        tipSmetkaComboBox.setStyle("-fx-font-size:14");
+        tipSmetkaComboBox.setStyle("-fx-font-size:16");
 
         Button pregledpoddv = new Button("Преглед по ДДВ");
-        pregledpoddv.setStyle("-fx-font-size:14");
+        pregledpoddv.setStyle("-fx-font-size:16");
         pregledpoddv.setOnAction(_ -> {
             setupRightDDVTable();
             adminfakturabtn.setDisable(true);
@@ -1881,6 +1887,7 @@ public class RestaurantApp extends Application {
         });
 
         Button izbrishaniButton = new Button("Преглед по избришани");
+        izbrishaniButton.setStyle("-fx-font-size:16");
         izbrishaniButton.setOnAction(_ -> {
             setupRightDeleteArtikliTable();
             if(timeFromField.getText().length() < 4 || timeToField.getText().length() < 4) {
@@ -1896,11 +1903,8 @@ public class RestaurantApp extends Application {
 
         // Exit button
         Button izleziButton = new Button("излези");
+        izleziButton.setStyle("-fx-font-size:16");
         izleziButton.setOnAction(_ -> adminStage.close());
-
-        izleziButton.setStyle("-fx-font-size:14");
-
-
 
         // Layout for the exit button
         HBox exitBox = new HBox(10, izleziButton);
@@ -2165,14 +2169,14 @@ public class RestaurantApp extends Application {
         // Create columns
         TableColumn<String[], String> artiklColumn = new TableColumn<>("Артикл");
         TableColumn<String[], String> kolicinaColumn = new TableColumn<>("Количина");
-        artiklColumn.setPrefWidth(160);
-        kolicinaColumn.setPrefWidth(40);
+        artiklColumn.setPrefWidth(200);
+        kolicinaColumn.setPrefWidth(60);
         TableColumn<String[], String> cenaColumn = new TableColumn<>("Цена");
         cenaColumn.setPrefWidth(70);
         TableColumn<String[], String> vkupnoColumn = new TableColumn<>("Вкупно");
         vkupnoColumn.setPrefWidth(70);
         TableColumn<String[], String> datumColumn = new TableColumn<>("Дата");
-        datumColumn.setPrefWidth(120);
+        datumColumn.setPrefWidth(150);
         TableColumn<String[], String> vremecolumm = new TableColumn<>("Време");
         TableColumn<String[], String> imecolumm = new TableColumn<>("Име");
 
@@ -2217,6 +2221,7 @@ public class RestaurantApp extends Application {
 
         artiklColumn.setPrefWidth(200);
         kolicinaColumn.setPrefWidth(100);
+        masaColumn.setPrefWidth(100);
 
         // Set cell value factories
         artiklColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
@@ -2343,7 +2348,7 @@ public class RestaurantApp extends Application {
 
             // Base query
             String query = """
-            select a.Naziv,i.kolicina,i.Datum,i.Masa
+            select a.Naziv,i.kolicina,TO_CHAR(i.Datum, 'HH24:MI:SS') as datum,i.Masa
             from izbrishani as i
             inner join Artikl as a on i.artiklid = a.id
             inner join Vraboten V on i.VrabotenShifra = V.Shifra
