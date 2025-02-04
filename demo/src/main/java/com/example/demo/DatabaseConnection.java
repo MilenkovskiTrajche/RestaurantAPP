@@ -20,10 +20,10 @@ public class DatabaseConnection {
             config.setJdbcUrl(URL);
             config.setUsername(USERNAME);
             config.setPassword(PASSWORD);
-            config.setMaximumPoolSize(2); // Adjust pool size based on your application's needs
-            config.setIdleTimeout(0); // 5minute
+            config.setMaximumPoolSize(2);
+            config.setIdleTimeout(0);
             config.setValidationTimeout(5000);
-            config.setMaxLifetime(57600000); // 30 minutes
+            config.setMaxLifetime(57600000); // 16h cel den
             config.setConnectionTimeout(5000); // 5 seconds to wait for a connection
             config.setConnectionTestQuery("SELECT 1");
             dataSource = new HikariDataSource(config);
