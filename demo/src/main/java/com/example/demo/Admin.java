@@ -272,7 +272,7 @@ public class Admin extends Application {
 
     private void loadVrabotenList() {
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement("select * from Vraboten where active = true"))
+             PreparedStatement stmt = conn.prepareStatement("select * from Vraboten"))
         {
             ResultSet rs = stmt.executeQuery();
 
@@ -353,7 +353,7 @@ public class Admin extends Application {
 
             try {
                 // Step 2: Check if the employee exists
-                String checkQuery = "SELECT COUNT(*) FROM Vraboten WHERE Shifra = ? AND active = TRUE";
+                String checkQuery = "SELECT COUNT(*) FROM Vraboten WHERE Shifra = ?";
                 try (PreparedStatement stmtCheck = conn.prepareStatement(checkQuery)) {
                     stmtCheck.setInt(1, shifraInt);
                     try (ResultSet rs = stmtCheck.executeQuery()) {
@@ -366,7 +366,7 @@ public class Admin extends Application {
                 }
 
                 // Step 3: Soft delete the employee - set active = FALSE and set deleted_at timestamp
-                String updateQuery = "UPDATE Vraboten SET active = FALSE, deleted_at = CURRENT_TIMESTAMP WHERE Shifra = ?";
+                String updateQuery = "delete from vraboten where shifra = ?";
                 try (PreparedStatement stmtUpdate = conn.prepareStatement(updateQuery)) {
                     stmtUpdate.setInt(1, shifraInt);
                     int rowsUpdated = stmtUpdate.executeUpdate();

@@ -50,6 +50,20 @@
             <version>5.0.1</version>
         </dependency>
 
+        <!-- SLF4J 1.x (compatible with Logback 1.4.x) -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.16</version> <!-- Use a stable 1.x version -->
+        </dependency>
+
+        <!-- Logback 1.4.x (compatible with SLF4J 1.x) -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>1.4.12</version> <!-- Recommended Logback version for SLF4J 1.x -->
+        </dependency>
+
     </dependencies>
 
     <build>

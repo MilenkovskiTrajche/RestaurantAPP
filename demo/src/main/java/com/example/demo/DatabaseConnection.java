@@ -15,15 +15,21 @@ public class DatabaseConnection {
 
     // Initialize the connection pool
     static {
-        HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(URL);
-        config.setUsername(USERNAME);
-        config.setPassword(PASSWORD);
-        config.setMaximumPoolSize(2); // Adjust pool size based on your application's needs
-        config.setIdleTimeout(300000); // 5minute
-        config.setMaxLifetime(1800000); // 30 minutes
-        config.setConnectionTimeout(5000); // 5 seconds to wait for a connection
-        dataSource = new HikariDataSource(config);
+        try {
+            HikariConfig config = new HikariConfig();
+            config.setJdbcUrl(URL);
+            config.setUsername(USERNAME);
+            config.setPassword(PASSWORD);
+            config.setMaximumPoolSize(2); // Adjust pool size based on your application's needs
+            config.setIdleTimeout(0); // 5minute
+            config.setValidationTimeout(5000);
+            config.setMaxLifetime(57600000); // 30 minutes
+            config.setConnectionTimeout(5000); // 5 seconds to wait for a connection
+            config.setConnectionTestQuery("SELECT 1");
+            dataSource = new HikariDataSource(config);
+        }catch (Exception e) {
+            throw new ExceptionInInitializerError("Failed to initialize HikariCp: " + e.getMessage());
+        }
     }
 
     // Get a connection from the pool

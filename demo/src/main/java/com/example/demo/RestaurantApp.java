@@ -66,6 +66,7 @@ public class RestaurantApp extends Application {
     private TableView<String[]> leftAdminTable = new TableView<>();
     private final ObservableList<String[]> rezultatiAdmin = FXCollections.observableArrayList();
     private TableView<String[]> rightAdminResultTable = new TableView<>();
+    private TableView<String[]> rightDeleteArticlsTable = new TableView<>();
 
     @Override
     public void start(Stage primaryStage) {
@@ -113,7 +114,7 @@ public class RestaurantApp extends Application {
                 passwordField.setText("");
                 tableField.setText("");
                 Platform.runLater(passwordField::requestFocus);
-                return; // Exit if input is not a valid number
+                return;
             }
             if(checkAdmin(passwordField.getText()) && enteredTable.isEmpty()){
                 showAdminPanel();
@@ -173,7 +174,7 @@ public class RestaurantApp extends Application {
         if (tableNumber.isEmpty()) return;
 
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement("SELECT * FROM vraboten WHERE shifra = ? and active = true"))
+             PreparedStatement stmt = conn.prepareStatement("SELECT * FROM vraboten WHERE shifra = ?"))
         {
             stmt.setInt(1, Integer.parseInt(ps));
             try (ResultSet rs = stmt.executeQuery()) {
@@ -555,26 +556,13 @@ public class RestaurantApp extends Application {
                         throw new RuntimeException(e);
                     }
                     try (Connection conn = DatabaseConnection.getConnection()) {
-                        String insertIzbrihaniQuery = "INSERT INTO Izbrihani (Masa, VrabotenShifra) VALUES (?, ?)";
+                        String insertIzbrihaniQuery = "INSERT INTO izbrishani (Masa, VrabotenShifra,artiklID,kolicina) VALUES (?, ?,?,?)";
                         try (PreparedStatement stmt = conn.prepareStatement(insertIzbrihaniQuery, Statement.RETURN_GENERATED_KEYS)) {
                             stmt.setInt(1, Integer.parseInt(tn)); // Masa
                             stmt.setInt(2, employeeId); // VrabotenShifra
+                            stmt.setInt(3,articleId);
+                            stmt.setInt(4,quantity);
                             stmt.executeUpdate();
-
-                            // Get the generated Izbrihani ID (for linking deleted items)
-                            ResultSet rs = stmt.getGeneratedKeys();
-                            if (rs.next()) {
-                                int izbrihaniId = rs.getInt(1);
-
-                                // Log the article into StavkaNaIzbrishani
-                                String insertStavkaQuery = "INSERT INTO StavkaNaIzbrishani (IzbrishaniId, ArtiklId, Kolicina) VALUES (?, ?, ?)";
-                                try (PreparedStatement insertStmt = conn.prepareStatement(insertStavkaQuery)) {
-                                    insertStmt.setInt(1, izbrihaniId);
-                                    insertStmt.setInt(2, articleId);
-                                    insertStmt.setInt(3, quantity);
-                                    insertStmt.executeUpdate();
-                                }
-                            }
                         }
                     } catch (SQLException e) {
                         e.printStackTrace(); // Handle the SQL exception
@@ -788,7 +776,6 @@ public class RestaurantApp extends Application {
         bottomButtonsBox2.setAlignment(Pos.BASELINE_LEFT);  // Align buttons at the center
         bottomButtonsBox2.getChildren().addAll(transferArticleButton,transferButton,deleteButton);
 
-
         Platform.runLater(articleInputField::requestFocus);
         // Bottom button layout using HBox
         HBox bottomButtonsBox = new HBox(20);  // 20px spacing between buttons
@@ -802,6 +789,7 @@ public class RestaurantApp extends Application {
 
         return middleBox;
     }
+
 
     private int getStavkaNarackaId(int employeeId, int narackaId, int artiklId, int kolicina) throws SQLException {
         String query = "SELECT sn.id FROM StavkaNaracka AS sn " +
@@ -828,6 +816,7 @@ public class RestaurantApp extends Application {
 
             // Calculate the total price
             int totalPrice = 0;
+            String imevraboten=ime;
             for (String[] row : AllData) {
                 int articleId = Integer.parseInt(row[0]);   // Assuming ID is in the first column
                 int quantity = Integer.parseInt(row[3]);    // Assuming Quantity is in the fourth column
@@ -842,14 +831,24 @@ public class RestaurantApp extends Application {
                         }
                     }
                 }
+
+                try (PreparedStatement stmt = conn.prepareStatement("select ime from vraboten where shifra = ?")) {
+                    stmt.setInt(1, employeeId);
+                    try (ResultSet rs = stmt.executeQuery()) {
+                        if (rs.next()) {
+                            imevraboten = rs.getString("ime");
+                        }
+                    }
+                }
             }
 
             // Insert the bill (Smetka)
             int smetkaId;
-            try (PreparedStatement stmt = conn.prepareStatement("INSERT INTO Smetka (VrabotenShifra, Masa, Vkupno) VALUES (?, ?, ?) RETURNING Id")) {
+            try (PreparedStatement stmt = conn.prepareStatement("INSERT INTO Smetka (VrabotenShifra, Masa, Vkupno,vrabotenime) VALUES (?, ?, ?,?) RETURNING Id")) {
                 stmt.setInt(1, employeeId);  // The employee ID
                 stmt.setInt(2, Integer.parseInt(tn));  // The table number (tn)
                 stmt.setInt(3, totalPrice);
+                stmt.setString(4,imevraboten);
                 try (ResultSet rs = stmt.executeQuery()) {
                     if (rs.next()) {
                         smetkaId = rs.getInt("Id");
@@ -1201,7 +1200,6 @@ public class RestaurantApp extends Application {
         // Add columns to the TableView
         tableView.getColumns().addAll(articleColumn, quantityColumn, priceColumn, sumPriceColumn);
         tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-
         // Create the layout
         Label totalPriceLabel = new Label("Вкупно: " + totalPrice);
         totalPriceLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
@@ -1292,14 +1290,15 @@ public class RestaurantApp extends Application {
         orderData.add(orderItem);
 
         tableOrders.computeIfAbsent(tn, _ -> new ArrayList<>()).add(orderItem);
-
-        updateTotalPrice(tn, employeeId);
+        //1
+        //updateTotalPrice(tn, employeeId);
 
         orderData.remove(orderItem);
         AllData.clear(); // Clear before adding the new data
         AllData.addAll(tableOrders.get(tn));
 
         saveOrderToDatabase(tn, employeeId, Integer.parseInt(selectedArticle[0]), quantity);
+        updateTotalPrice(tn, employeeId);
     }
     // Method to get the current time and return it as a String
     private String getCurrentTime() {
@@ -1338,7 +1337,6 @@ public class RestaurantApp extends Application {
         for (String[] article : orderData) {
             totalPrice += Integer.parseInt(article[2]) * Integer.parseInt(article[3]);  // Price * Quantity
         }
-        vk_cena += totalPrice;
         totalPriceLabel.setText("Вкупно: " + vk_cena);
     }
 
@@ -1628,7 +1626,7 @@ public class RestaurantApp extends Application {
 
     static boolean checkPassword(String proverka) {
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement("SELECT * FROM vraboten where active = true");
+             PreparedStatement stmt = conn.prepareStatement("SELECT * FROM vraboten");
              ResultSet rs = stmt.executeQuery()) {
 
             while (rs.next()) {
@@ -1708,7 +1706,6 @@ public class RestaurantApp extends Application {
         HBox doludesno = new HBox();
         doludesno.setSpacing(10);
         doludesno.setStyle("-fx-font-size: 16px;");
-
         // Create a spacer
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS); // Allow the spacer to grow
@@ -1883,7 +1880,17 @@ public class RestaurantApp extends Application {
             showEmployeeOverview(datefrom.getValue(), dateto.getValue(), timeFromField.getText(), timeToField.getText(), vrabotenComboBox.getValue().shifra, vrabotenComboBox.getValue().ime);
         });
 
-        HBox smetkilayot = new HBox(10,pregledSmetkiButton,tipsmetka,tipSmetkaComboBox,pregledpoddv);
+        Button izbrishaniButton = new Button("Преглед по избришани");
+        izbrishaniButton.setOnAction(_ -> {
+            setupRightDeleteArtikliTable();
+            if(timeFromField.getText().length() < 4 || timeToField.getText().length() < 4) {
+                timeFromField.setText("00:00");
+                timeToField.setText(LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")));
+            }
+            executeDeleteArtikliQuery(datefrom.getValue(), dateto.getValue(), timeFromField.getText(), timeToField.getText(), vrabotenComboBox.getValue().shifra);
+        });
+
+        HBox smetkilayot = new HBox(10,pregledSmetkiButton,tipsmetka,tipSmetkaComboBox,pregledpoddv,izbrishaniButton);
         smetkilayot.setAlignment(Pos.CENTER_LEFT);
         smetkilayot.setPadding(new Insets(10));
 
@@ -1892,6 +1899,8 @@ public class RestaurantApp extends Application {
         izleziButton.setOnAction(_ -> adminStage.close());
 
         izleziButton.setStyle("-fx-font-size:14");
+
+
 
         // Layout for the exit button
         HBox exitBox = new HBox(10, izleziButton);
@@ -1939,7 +1948,7 @@ public class RestaurantApp extends Application {
         List<Employee> employees = new ArrayList<>();
         try (Connection conn = DatabaseConnection.getConnection();
              Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT ime, shifra FROM vraboten where active = true")) {
+             ResultSet rs = stmt.executeQuery("SELECT ime, shifra FROM vraboten")) {
             while (rs.next()) {
                 employees.add(new Employee(rs.getString("ime"), rs.getString("shifra")));
             }
@@ -1993,11 +2002,12 @@ public class RestaurantApp extends Application {
 
             // Base query
             String query = """
-            SELECT v.ime, id, masa, Vkupno, Date(Datum) as datum, TO_CHAR(Datum, 'HH24:MI:SS') as vreme, Smetka.tip
+            SELECT smetka.vrabotenime as ime, id, masa, Vkupno, Date(Datum) as datum, TO_CHAR(Datum, 'HH24:MI:SS') as vreme, Smetka.tip
             FROM smetka
-                     INNER JOIN vraboten AS v ON smetka.VrabotenShifra = v.Shifra
+                     left outer join vraboten AS v ON smetka.VrabotenShifra = v.Shifra
             WHERE (Datum >= ?::timestamp + ?::time)
               AND (Datum <= ?::timestamp + ?::time)
+              and smetka.vrabotenime is not null
         """;
 
             // Dynamically add conditions
@@ -2074,12 +2084,13 @@ public class RestaurantApp extends Application {
 
             // Base query
             String query = """
-            select a.ddv,SUM(a.cena * sn.kolicina - (a.cena * sn.kolicina / (1 + (a.ddv / 100.0))))AS ddv_vrednost
+            select a.ddv,SUM(a.ddv_value)AS ddv_vrednost
             from stavkanasmetka as sn
             inner join artikl as a on sn.ArtiklId = a.Id
             inner join smetka as s on sn.SmetkaId = s.Id
             WHERE (s.Datum >= ?::timestamp + ?::time)
               AND (s.Datum <= ?::timestamp + ?::time)
+              AND s.vrabotenime is not null
         """;
 
             // Dynamically add conditions
@@ -2195,6 +2206,27 @@ public class RestaurantApp extends Application {
         // Add columns to the TableView
         rightAdminResultTable.getColumns().addAll(artiklColumn, kolicinaColumn);
     }
+    private void setupRightDeleteArtikliTable() {
+        rightAdminResultTable.getColumns().clear();
+
+        // Create columns
+        TableColumn<String[], String> artiklColumn = new TableColumn<>("Артикл");
+        TableColumn<String[], String> kolicinaColumn = new TableColumn<>("Количина");
+        TableColumn<String[], String> vremeColumn = new TableColumn<>("Време");
+        TableColumn<String[], String> masaColumn = new TableColumn<>("Маса");
+
+        artiklColumn.setPrefWidth(200);
+        kolicinaColumn.setPrefWidth(100);
+
+        // Set cell value factories
+        artiklColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
+        kolicinaColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[1]));
+        vremeColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[2]));
+        masaColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[3]));
+
+        // Add columns to the TableView
+        rightAdminResultTable.getColumns().addAll(artiklColumn, kolicinaColumn,vremeColumn,masaColumn);
+    }
     private void setupRightDDVTable() {
         rightAdminResultTable.getColumns().clear();
 
@@ -2231,6 +2263,7 @@ public class RestaurantApp extends Application {
             inner join artikl as a on a.id = sn.artiklid
             WHERE (Datum >= ?::timestamp + ?::time)
               AND (Datum <= ?::timestamp + ?::time)
+              AND s.vrabotenime is not null
         """;
 
             // Dynamically add conditions
@@ -2298,15 +2331,93 @@ public class RestaurantApp extends Application {
         }
     }
 
+    private void executeDeleteArtikliQuery(LocalDate dateFrom, LocalDate dateTo, String vremeod, String vremedo,String vrabotenshifra) {
+        try {
+            // Ensure the time string is in the format HH:MM:SS
+            if (vremeod.length() == 5) {
+                vremeod += ":00"; // Append seconds
+            }
+            if (vremedo.length() == 5) {
+                vremedo += ":59"; // Append seconds
+            }
+
+            // Base query
+            String query = """
+            select a.Naziv,i.kolicina,i.Datum,i.Masa
+            from izbrishani as i
+            inner join Artikl as a on i.artiklid = a.id
+            inner join Vraboten V on i.VrabotenShifra = V.Shifra
+            WHERE (datum >= ?::timestamp + ?::time)
+              AND (datum <= ?::timestamp + ?::time)
+        """;
+
+            // Dynamically add conditions
+            boolean filterByShifrav = !vrabotenshifra.equals("сите");
+
+            if (filterByShifrav) {
+                query += " AND i.vrabotenshifra = ?";
+            }
+
+            // Add grouping and ordering
+            query += """
+            order by i.kolicina DESC;
+        """;
+
+            // Establish database connection
+            Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement ps = conn.prepareStatement(query);
+
+            // Set the common parameters
+            ps.setDate(1, java.sql.Date.valueOf(dateFrom)); // Date from
+            ps.setTime(2, Time.valueOf(vremeod)); // Time from
+            ps.setDate(3, java.sql.Date.valueOf(dateTo)); // Date to
+            ps.setTime(4, Time.valueOf(vremedo)); // Time to
+
+            // Set conditional parameters
+            if (filterByShifrav) {
+                ps.setInt(5,Integer.parseInt(vrabotenshifra)); // Add shifrav to the query
+            }
+
+            // Execute query
+            ResultSet rs = ps.executeQuery();
+
+            // Clear previous data
+            rezultatiAdmin.clear();
+
+            // Add results to the ObservableList
+            while (rs.next()) {
+                String[] row = new String[]{
+                        rs.getString("naziv"),
+                        rs.getString("kolicina"),
+                        rs.getString("datum"),
+                        rs.getString("masa")
+                };
+                rezultatiAdmin.add(row);
+            }
+
+            // Close resources
+            rs.close();
+            ps.close();
+            conn.close();
+
+            // Update TableView
+            rightAdminResultTable.setItems(rezultatiAdmin);
+            rightAdminResultTable.refresh();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            // Handle exceptions (show an alert or log the error)
+        }
+    }
+
     private void executeQueryResult(String smetkaid) {
         try {
             // SQL query with explicit type casting for date comparison
             String query = """
                 select a.Naziv,sn.Kolicina,a.Cena as cena,a.Cena*sn.Kolicina as vkupno,DATE(Datum) as datum,TO_CHAR(vreme, 'HH24:MI:SS') AS vreme,v.ime as ime
                 from smetka as s
+                left outer join vraboten as v on s.vrabotenshifra = v.shifra
                 inner join stavkanasmetka as sn on s.Id = sn.SmetkaId
                 inner join artikl as a on sn.ArtiklId = a.Id
-                inner join vraboten as v on s.vrabotenshifra = v.shifra
                 where SmetkaId = ?;
             """;
 
@@ -2370,10 +2481,9 @@ public class RestaurantApp extends Application {
         """;
 
         String deletedItemsQuery = """
-        SELECT a.Naziv, s.Kolicina, i.Datum,i.masa
-        FROM Izbrihani i
-        JOIN StavkaNaIzbrishani s ON i.Id = s.IzbrishaniId
-        JOIN Artikl a ON s.ArtiklId = a.Id
+        SELECT a.Naziv, i.kolicina, i.Datum,i.masa
+        FROM izbrishani i
+        JOIN Artikl a ON i.ArtiklId = a.Id
         WHERE (Datum >= ?::timestamp + ?::time)
               AND (Datum <= ?::timestamp + ?::time)
     """;
