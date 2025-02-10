@@ -24,6 +24,7 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.scene.input.KeyCode;
 import javafx.stage.StageStyle;
+import javafx.beans.binding.Bindings;
 
 import java.sql.*;
 import java.time.LocalDate;
@@ -44,6 +45,10 @@ public class RestaurantApp extends Application {
     private final GridPane tableGrid = new GridPane();
     TableView<String[]> orderTable = new TableView<>();
     private final ObservableList<String[]> orderData = FXCollections.observableArrayList();
+    private final ObservableList<String[]> orderDataPrintShank = FXCollections.observableArrayList();
+    private final ObservableList<String[]> orderDataPrintKujna = FXCollections.observableArrayList();
+
+
     public static final ObservableList<String[]> AllData = FXCollections.observableArrayList();
     private final Label totalPriceLabel = new Label("Вкупно: 0");
     private final TextField articleInputField = new TextField();
@@ -66,7 +71,6 @@ public class RestaurantApp extends Application {
     private TableView<String[]> leftAdminTable = new TableView<>();
     private final ObservableList<String[]> rezultatiAdmin = FXCollections.observableArrayList();
     private TableView<String[]> rightAdminResultTable = new TableView<>();
-    private TableView<String[]> rightDeleteArticlsTable = new TableView<>();
 
     @Override
     public void start(Stage primaryStage) {
@@ -431,7 +435,6 @@ public class RestaurantApp extends Application {
                                     showAlertInformation("Не постои артикл");
                                     return;
                                 }
-
                                 // Add the article with the specified or default quantity
                                 addToOrder(selectedArticle, kolicina, tn, employeeId);
 
@@ -477,6 +480,15 @@ public class RestaurantApp extends Application {
                 String btnname = ime + ":" + tn;
                 deleteTableButtonFromGrid(btnname);
             }
+            PrinterService printerService = new PrinterService();
+            if(!orderDataPrintKujna.isEmpty()){
+                printerService.printOrder(ime, Integer.parseInt(tn),orderDataPrintKujna,"Нарачка - кујна");
+                orderDataPrintKujna.clear();
+            }
+            if(!orderDataPrintShank.isEmpty()){
+                printerService.printOrder(ime, Integer.parseInt(tn), orderDataPrintShank, "Нарачка - шанк");
+                orderDataPrintShank.clear();
+            }
             articleStage.close()
         ;});
         escButton.setAlignment(Pos.BOTTOM_CENTER);
@@ -492,12 +504,13 @@ public class RestaurantApp extends Application {
                 alert.showAndWait();
                 return;
             }
-            createBill(employeeId,tn,"фискална","Фискална");
+            createBill(employeeId,tn,"фискална");
             String btnname = ime + ":" + tn;
             deleteTableButtonFromGrid(btnname);
             smetkaData.clear();
             AllData.clear();
-            articleStage.close();
+            escButton.fire();
+            //articleStage.close();
         });
 
         tableView.setOnMouseClicked(event -> {
@@ -520,13 +533,14 @@ public class RestaurantApp extends Application {
                 alert.showAndWait();
                 return;
             }
-            createBill(employeeId,tn,"фактура","Фактура");
+            createBill(employeeId,tn,"фактура");
 
             String btnname = ime + ":" + tn;
             deleteTableButtonFromGrid(btnname);
             smetkaData.clear();
             AllData.clear();
-            articleStage.close();
+            escButton.fire();
+            //articleStage.close();
         });
 
         deleteButton.setOnAction(_ -> {
@@ -578,6 +592,20 @@ public class RestaurantApp extends Application {
 
                     // Remove the selected item from AllData (ObservableList)
                     AllData.remove(selectedItem);
+
+                    // Clone the selected item so we don't modify the original reference
+                    String[] deletedItem = selectedItem.clone();
+
+                    // Modify the article name (second element in the array)
+                    deletedItem[3] = "-" + deletedItem[3];
+                    if(checktipShankArtikl(Integer.parseInt(selectedItem[0]))){
+                        //orderDataPrintShank.remove(selectedItem);
+                        orderDataPrintShank.add(deletedItem);     // Add the modified version
+                    }
+                    if(!checktipShankArtikl(Integer.parseInt(selectedItem[0]))){
+                        //orderDataPrintKujna.remove(selectedItem);
+                        orderDataPrintKujna.add(deletedItem);     // Add the modified version
+                    }
                     orderData.remove(selectedItem);
 
                     loadPreviousOrders(tn, employeeId);
@@ -611,6 +639,10 @@ public class RestaurantApp extends Application {
                     int targetTable = Integer.parseInt(newTableNumber);
                     if (targetTable <= 0) {
                         showAlert("Внесете валиден број за маса.");
+                        return;
+                    }
+                    if(targetTable == Integer.parseInt(tn)) {
+                        showAlert("Внесовте иста маса!");
                         return;
                     }
                     // Transfer orders in the database
@@ -653,6 +685,10 @@ public class RestaurantApp extends Application {
                     int targetTable = Integer.parseInt(newTableNumber);
                     if (targetTable <= 0) {
                         showAlert("Внесете валиден број за маса.");
+                        return;
+                    }
+                    if(targetTable == Integer.parseInt(tn)) {
+                        showAlert("Внесовте иста маса!");
                         return;
                     }
 
@@ -728,6 +764,10 @@ public class RestaurantApp extends Application {
                         if (shifra < 0) {
                             showAlertInformation("Обиди се повторно");
                             continue;
+                        }
+                        if(shifra == employeeId){
+                            showAlert("Внесовте иста шифра!");
+                            return;
                         }
                     } catch (NumberFormatException e) {
                         showAlertInformation("Шифрата мора да е број!");
@@ -810,7 +850,7 @@ public class RestaurantApp extends Application {
         }
     }
 
-    private void createBill(int employeeId,String tn,String tipSmetka,String titleSmetka){
+    private void createBill(int employeeId,String tn,String tipSmetka){
         try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false); // Start transaction
 
@@ -904,7 +944,36 @@ public class RestaurantApp extends Application {
             }
 
             // Commit the transaction
-            conn.commit();
+            //conn.commit();
+            double ddv18 = 0.0;
+            double ddv15 = 0.0;
+            double ddv5 = 0.0;
+            double ddvValue = 0.0;
+
+            try (PreparedStatement stmt = conn.prepareStatement("""
+                SELECT a.ddv, SUM(a.ddv_value) AS sumaDDV
+                FROM smetka AS s
+                INNER JOIN public.stavkanasmetka s2 ON s.id = s2.smetkaid
+                INNER JOIN public.artikl a ON s2.artiklid = a.id
+                WHERE smetkaid = ?
+                GROUP BY a.ddv;
+                """)) {
+
+                stmt.setInt(1, smetkaId);
+
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        ddvValue = rs.getDouble("sumaDDV");  // Get the sum of DDV
+                        int ddvType = rs.getInt("ddv");  // Get the DDV percentage
+
+                        switch (ddvType) {
+                            case 18 -> ddv18 = ddvValue;
+                            case 15 -> ddv15 = ddvValue;
+                            case 5 -> ddv5 = ddvValue;
+                        }
+                    }
+                }
+            }
 
             try (PreparedStatement stmt = conn.prepareStatement("""
                         select A.Naziv as artikli,sum(SNS.Kolicina) as Kolicina,MAX(A.Cena) as cena_Artikl,sum(SNS.Kolicina*A.Cena) as vkupno
@@ -934,12 +1003,112 @@ public class RestaurantApp extends Application {
                         });
                     }
                 }
-                showBillPopup(smetkaData,totalPrice, titleSmetka,tn);
+                //showBillPopup(smetkaData,totalPrice, titleSmetka,tn);
             }
+            BillPrinter billPrinter = new BillPrinter();
+            billPrinter.printBill(imevraboten, smetkaData, ddv18, ddv15, ddv5,ddvValue , totalPrice);
+
             conn.commit();
 
         } catch (SQLException ex) {
             System.out.println("MiddleSectioin sql exception" + ex);
+            try (Connection conn = DatabaseConnection.getConnection()) {
+                conn.rollback();  // Rollback transaction on failure
+            } catch (SQLException rollbackEx) {
+                rollbackEx.printStackTrace();
+            }
+
+            // Show an error message
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText(null);
+            alert.setContentText("Грешка додека се правеше сметката. Обиди се уште еднаш.");
+            alert.showAndWait();
+        }
+    }
+    private void admincreateBill(int smetkaId,int employeeId){
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            conn.setAutoCommit(false); // Start transaction
+
+            double ddv18 = 0.0;
+            double ddv15 = 0.0;
+            double ddv5 = 0.0;
+            double ddvValue = 0.0;
+
+            try (PreparedStatement stmt = conn.prepareStatement("""
+                SELECT a.ddv, SUM(a.ddv_value) AS sumaDDV
+                FROM smetka AS s
+                INNER JOIN public.stavkanasmetka s2 ON s.id = s2.smetkaid
+                INNER JOIN public.artikl a ON s2.artiklid = a.id
+                WHERE smetkaid = ?
+                GROUP BY a.ddv;
+                """)) {
+
+                stmt.setInt(1, smetkaId);
+
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        ddvValue = rs.getDouble("sumaDDV");  // Get the sum of DDV
+                        int ddvType = rs.getInt("ddv");  // Get the DDV percentage
+
+                        switch (ddvType) {
+                            case 18 -> ddv18 = ddvValue;
+                            case 15 -> ddv15 = ddvValue;
+                            case 5 -> ddv5 = ddvValue;
+                        }
+                    }
+                }
+            }
+
+            String imevraboten="";
+            try (PreparedStatement stmt = conn.prepareStatement("""
+                        select ime from vraboten where shifra = ?
+                        """)) {
+                stmt.setInt(1, employeeId);  // The employee ID
+
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        imevraboten = rs.getString("ime");
+                    }
+                }
+            }
+            int totalPrice=0;
+            try (PreparedStatement stmt = conn.prepareStatement("""
+                        select A.Naziv as artikli,sum(SNS.Kolicina) as Kolicina,MAX(A.Cena) as cena_Artikl,sum(SNS.Kolicina*A.Cena) as vkupno
+                        from Smetka as s
+                        inner join StavkaNaSmetka SNS on s.Id = SNS.SmetkaId
+                        inner join vraboten as v on s.VrabotenShifra = v.Shifra
+                        inner join Artikl A on SNS.ArtiklId = A.Id
+                        where VrabotenShifra= ? and SmetkaId= ?
+                        group by A.naziv;""")) {
+                stmt.setInt(1, employeeId);  // The employee ID
+                stmt.setInt(2, smetkaId);
+
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        String naziv = rs.getString("artikli");
+                        int kolicina = rs.getInt("Kolicina");
+                        int cena = rs.getInt("cena_artikl");
+                        int vkupno = rs.getInt("vkupno");
+                        totalPrice+=vkupno;
+
+                        // Add the data to the ObservableList
+                        smetkaData.add(new String[]{
+                                naziv,                     // Article Name
+                                String.valueOf(kolicina),  // Quantity
+                                String.valueOf(cena),      // Price
+                                String.valueOf(vkupno)     // Total Price per Article
+                        });
+                    }
+                }
+            }
+            BillPrinter billPrinter = new BillPrinter();
+            billPrinter.printBill(imevraboten, smetkaData, ddv18, ddv15, ddv5,ddvValue , totalPrice);
+
+            conn.commit();
+
+        } catch (SQLException ex) {
+            System.out.println("admincreateBILL sql exception" + ex);
             try (Connection conn = DatabaseConnection.getConnection()) {
                 conn.rollback();  // Rollback transaction on failure
             } catch (SQLException rollbackEx) {
@@ -1289,9 +1458,14 @@ public class RestaurantApp extends Application {
 
         orderData.add(orderItem);
 
+        if(checktipShankArtikl(Integer.parseInt(selectedArticle[0]))) {
+            orderDataPrintShank.add(orderItem);
+        }
+        if(!checktipShankArtikl(Integer.parseInt(selectedArticle[0]))) {
+            orderDataPrintKujna.add(orderItem);
+        }
+
         tableOrders.computeIfAbsent(tn, _ -> new ArrayList<>()).add(orderItem);
-        //1
-        //updateTotalPrice(tn, employeeId);
 
         orderData.remove(orderItem);
         AllData.clear(); // Clear before adding the new data
@@ -1304,6 +1478,27 @@ public class RestaurantApp extends Application {
     private String getCurrentTime() {
         LocalTime now = LocalTime.now();  // Get the current time
         return now.format(DateTimeFormatter.ofPattern("HH:mm:ss"));  // Format it as HH:mm
+    }
+    private boolean checktipShankArtikl(int idArtikl) {
+        int vk_cena = 0;
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement("""
+                     select tip from artikl where id = ?;
+                    """)) {
+
+            stmt.setInt(1,idArtikl);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    String tip = rs.getString("tip");
+                    if(tip.equals("shank")){
+                        return true;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            System.out.println("getTotalPrice sql exception" + e);
+        }
+        return false;
     }
 
     private int getTotalPrice(String tn,int employeeId) {
@@ -1465,6 +1660,17 @@ public class RestaurantApp extends Application {
             }
         } catch (SQLException e) {
             System.out.println("saveOrderToDatabase sql exception" + e);
+        }
+    }
+    private void changeTipSmetka(int smetkaID) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            try (PreparedStatement stmt = conn.prepareStatement(
+                    "update smetka set tip = 'фискална' where id = ?;")) {
+                stmt.setInt(1, smetkaID);
+                stmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            System.out.println("changeTipSmetka sql exception" + e);
         }
     }
 
@@ -1686,35 +1892,36 @@ public class RestaurantApp extends Application {
         // Create top and bottom sections for the left side
         leftAdminTable = new TableView<>(); // Top part (TableView)
         setupLeftAdminTable();
-        leftAdminTable.setStyle("-fx-font-size: 24px;");
 
         VBox leftBottomBox = createBottomSection(); // Bottom part (Form fields and buttons)
 
         // Left Split Pane: Top - TableView, Bottom - Form
         leftSplitPane.getItems().addAll(leftAdminTable, leftBottomBox);
         leftSplitPane.setOrientation(Orientation.VERTICAL);
-        leftSplitPane.setDividerPosition(0, 0.70); // 50% for the top TableView and bottom form section
-        leftSplitPane.setDividerPosition(1,0.30);
+        leftSplitPane.setDividerPosition(0, 0.60); // 50% for the top TableView and bottom form section
+        leftSplitPane.setDividerPosition(1,0.40);
 
         // Right side: TableView for displaying the result (takes full height)
         rightAdminResultTable = new TableView<>();// Table to show results
-
-        rightAdminResultTable.setStyle("-fx-font-size: 24px;");
 
         SplitPane rightSplitPane = new SplitPane();
 
         HBox doludesno = new HBox();
         doludesno.setSpacing(10);
-        doludesno.setStyle("-fx-font-size: 16px;");
         // Create a spacer
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS); // Allow the spacer to grow
 
-        adminfiskalnabtn.setStyle("-fx-font-size: 16px;");adminfakturabtn.setStyle("-fx-font-size: 16px;");
         totalPriceLabel.setText("");
-        doludesno.setMaxHeight(30);
+        doludesno.setMaxHeight(40);
         adminfakturabtn.setDisable(true);adminfiskalnabtn.setDisable(true);
+        adminfakturabtn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.25));
+        adminfakturabtn.styleProperty().bind(Bindings.concat("-fx-font-size: ", rightAdminResultTable.widthProperty().divide(40).asString(), "px;"));
+        adminfiskalnabtn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.25));
+        adminfiskalnabtn.styleProperty().bind(Bindings.concat("-fx-font-size: ", rightAdminResultTable.widthProperty().divide(40).asString(), "px;"));
+
         doludesno.getChildren().addAll(adminfiskalnabtn, adminfakturabtn,spacer,totalPriceLabel);
+
         rightSplitPane.getItems().addAll(rightAdminResultTable,doludesno);
 
         rightSplitPane.setOrientation(Orientation.VERTICAL);
@@ -1739,17 +1946,19 @@ public class RestaurantApp extends Application {
     private void setupLeftAdminTable() {
         // Create columns
         TableColumn<String[], String> imeColumn = new TableColumn<>("Име");
-        imeColumn.setPrefWidth(150);
+        imeColumn.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.15));
         TableColumn<String[], String> idColumn = new TableColumn<>("Id");
+        idColumn.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.10));
         TableColumn<String[], String> masaColumn = new TableColumn<>("Маса");
+        masaColumn.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.10));
         TableColumn<String[], String> vkupnoColumn = new TableColumn<>("Вкупно");
-        vkupnoColumn.setPrefWidth(150);
+        vkupnoColumn.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.13));
         TableColumn<String[], String> datumColumn = new TableColumn<>("Дата");
-        datumColumn.setPrefWidth(150);
+        datumColumn.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.19));
         TableColumn<String[], String> vremecolumm = new TableColumn<>("Време");
-        vremecolumm.setPrefWidth(150);
+        vremecolumm.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.15));
         TableColumn<String[], String> tipColumn = new TableColumn<>("Тип");
-        tipColumn.setPrefWidth(120);
+        tipColumn.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.14));
 
         // Set cell value factories to bind the correct column data
         imeColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
@@ -1759,6 +1968,11 @@ public class RestaurantApp extends Application {
         datumColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[4]));
         vremecolumm.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[5]));
         tipColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[6]));
+
+        // Bind font size dynamically based on scene width
+        leftAdminTable.styleProperty().bind(Bindings.concat("-fx-font-size: ",
+                leftAdminTable.widthProperty().divide(35).asString(), "px;"));
+
         // Add columns to the TableView
         leftAdminTable.getColumns().addAll(imeColumn, idColumn, masaColumn, vkupnoColumn, datumColumn, vremecolumm,tipColumn);
     }
@@ -1766,33 +1980,41 @@ public class RestaurantApp extends Application {
     private VBox createBottomSection() {
         VBox bottomSection = new VBox(10);
 
+        //date fields
         DatePicker datefrom  = new DatePicker();
         DatePicker dateto  = new DatePicker();
-        Label datefromLabel = new Label("Датум од:");
+
+        Label datefromLabel = new Label("Датум:");
         Label datetoLabel = new Label("до:");
-        datefromLabel.setStyle("-fx-font-size: 14px;");datetoLabel.setStyle("-fx-font-size: 14px;");
+        datefromLabel.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.10));
+        datetoLabel.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.05));
+        datefromLabel.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50).asString(), "px;"));
+        datetoLabel.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50).asString(), "px;"));
+
+
         datefrom.setValue(LocalDate.now());dateto.setValue(LocalDate.now());
-        datefrom.setMaxWidth(150);
-        datefrom.setPrefWidth(150);
-        dateto.setMinWidth(150);
-        dateto.setPrefWidth(150);
-        datefrom.setStyle("-fx-font-size:16");dateto.setStyle("-fx-font-size:16");
+        datefrom.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.23));
+        dateto.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.23));
+        datefrom.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50).asString(), "px;"));
+        dateto.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50).asString(), "px;"));
 
-        TextField timeFromField = new TextField();
-        TextField timeToField = new TextField();
-        Label timefromlabel = new Label("Време од:");
+
+        //time fileds
+        TextField timeFromField = new TextField("00:00");
+        TextField timeToField = new TextField(LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")));
+        Label timefromlabel = new Label("Време:");
         Label timetolabel = new Label("до:");
-        timefromlabel.setStyle("-fx-font-size: 14px");timetolabel.setStyle("-fx-font-size: 14px");
-        timeToField.setMaxWidth(60);
-        timeToField.setPrefWidth(60);
-        timeFromField.setMinWidth(60);
-        timeFromField.setPrefWidth(60);
-        String vremeod = "00:00";
-        String vremedo = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+        timefromlabel.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50).asString(), "px;"));
+        timetolabel.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50).asString(), "px;"));
+        timefromlabel.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.10));
+        timetolabel.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.05));
 
-        timeFromField.setText(vremeod);
-        timeToField.setText(vremedo);
-        timeToField.setStyle("-fx-font-size:16");timeFromField.setStyle("-fx-font-size:16");
+        timeFromField.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.12));
+        timeToField.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.12));
+        timeFromField.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
+        timeToField.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
+
+
         setMaxInputLength(timeToField,5);setMaxInputLength(timeFromField,5);
         validateTimeInput(timeFromField);validateTimeInput(timeToField);//min pomali od 60 sat pomal od 24
 
@@ -1800,41 +2022,52 @@ public class RestaurantApp extends Application {
         datetime.setAlignment(Pos.TOP_LEFT);
         datetime.setPadding(new Insets(10));
 
-        // "шифра вработен" ComboBox
-        Label vraboten = new Label("Вработен");
-        vraboten.setStyle("-fx-font-size: 14");
-        ComboBox<Employee> vrabotenComboBox = new ComboBox<>();
-        vrabotenComboBox.setMaxWidth(150);
+        Label vraboten = new Label("Вработен:");
+        vraboten.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.10));
+        vraboten.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
 
+        ComboBox<Employee> vrabotenComboBox = new ComboBox<>();
         Employee alloptions = new Employee("Сите", "сите");
         List<Employee> employees = fetchEmployees(); // Implement this method to fetch "ime" and "shifra" from the database.
         vrabotenComboBox.getItems().addFirst(alloptions);
         vrabotenComboBox.getItems().addAll(employees);
         vrabotenComboBox.setValue(alloptions);
-        vrabotenComboBox.setStyle("-fx-font-size:16");
+        vrabotenComboBox.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.15));
+        vrabotenComboBox.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
 
         Button prikaziButton = new Button("Прикажи");
         Button pregledVrabotenButton = new Button("Преглед по вработен");
         Button pregledArikliliButton = new Button("Преглед по артикли");
+        prikaziButton.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.15));
+        pregledVrabotenButton.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.25));
+        pregledArikliliButton.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.25));
+        prikaziButton.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
+        pregledVrabotenButton.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
+        pregledArikliliButton.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
 
-        prikaziButton.setStyle("-fx-font-size:16");pregledVrabotenButton.setStyle("-fx-font-size:16");pregledArikliliButton.setStyle("-fx-font-size:16");
         // Layout for the action buttons
-        HBox vrabotenartikli = new HBox(10,vraboten,vrabotenComboBox,prikaziButton, pregledVrabotenButton, pregledArikliliButton);
+        HBox vrabotenartikli = new HBox(10,vraboten,vrabotenComboBox,pregledVrabotenButton,prikaziButton);
         vrabotenartikli.setAlignment(Pos.CENTER_LEFT);
         vrabotenartikli.setPadding(new Insets(10));
 
+        //gore sredeno dynamic size width+font-size
         Button pregledSmetkiButton = new Button("Преглед по сметки");
-        pregledSmetkiButton.setStyle("-fx-font-size:16");
-        // Dropdown for "тип на сметка"
+        pregledSmetkiButton.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.25));
+        pregledSmetkiButton.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
+
         Label tipsmetka = new Label("Тип на сметка:");
-        tipsmetka.setStyle("-fx-font-size:14");
+        tipsmetka.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.15));
+        tipsmetka.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
+
         ComboBox<String> tipSmetkaComboBox = new ComboBox<>();
         tipSmetkaComboBox.getItems().addAll("Сите", "фискална", "фактура");
         tipSmetkaComboBox.setValue("Сите");
-        tipSmetkaComboBox.setStyle("-fx-font-size:16");
+        tipSmetkaComboBox.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.18));
+        tipSmetkaComboBox.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
 
         Button pregledpoddv = new Button("Преглед по ДДВ");
-        pregledpoddv.setStyle("-fx-font-size:16");
+        pregledpoddv.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.25));
+        pregledpoddv.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
         pregledpoddv.setOnAction(_ -> {
             setupRightDDVTable();
             adminfakturabtn.setDisable(true);
@@ -1865,7 +2098,7 @@ public class RestaurantApp extends Application {
             if (selectedItem != null) {
                 executeQueryResult(selectedItem[1]);
                 totalPriceLabel.setText("Вкупно: " + selectedItem[3]);
-                totalPriceLabel.setStyle("-fx-border-color: gray;-fx-font-size: 25;-fx-font-weight: bold;");
+                totalPriceLabel.setStyle("-fx-border-color: gray;-fx-font-size: 27;-fx-font-weight: bold;-fx-padding: 5");
                 if (selectedItem[6].equals("фискална")) {
                     adminfakturabtn.setDisable(false);
                 }
@@ -1887,9 +2120,12 @@ public class RestaurantApp extends Application {
         });
 
         Button izbrishaniButton = new Button("Преглед по избришани");
-        izbrishaniButton.setStyle("-fx-font-size:16");
+        izbrishaniButton.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.30));
+        izbrishaniButton.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
         izbrishaniButton.setOnAction(_ -> {
             setupRightDeleteArtikliTable();
+            adminfakturabtn.setDisable(true);
+            adminfiskalnabtn.setDisable(true);
             if(timeFromField.getText().length() < 4 || timeToField.getText().length() < 4) {
                 timeFromField.setText("00:00");
                 timeToField.setText(LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")));
@@ -1897,17 +2133,21 @@ public class RestaurantApp extends Application {
             executeDeleteArtikliQuery(datefrom.getValue(), dateto.getValue(), timeFromField.getText(), timeToField.getText(), vrabotenComboBox.getValue().shifra);
         });
 
-        HBox smetkilayot = new HBox(10,pregledSmetkiButton,tipsmetka,tipSmetkaComboBox,pregledpoddv,izbrishaniButton);
+        HBox smetkilayot = new HBox(10,tipsmetka,tipSmetkaComboBox,pregledSmetkiButton);
         smetkilayot.setAlignment(Pos.CENTER_LEFT);
         smetkilayot.setPadding(new Insets(10));
 
         // Exit button
         Button izleziButton = new Button("излези");
-        izleziButton.setStyle("-fx-font-size:16");
+        izleziButton.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.15));
+        izleziButton.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
         izleziButton.setOnAction(_ -> adminStage.close());
 
         // Layout for the exit button
-        HBox exitBox = new HBox(10, izleziButton);
+        HBox pregledi = new HBox(10,pregledArikliliButton,pregledpoddv,izbrishaniButton);
+        pregledi.setAlignment(Pos.BOTTOM_LEFT);
+        pregledi.setPadding(new Insets(10));
+        HBox exitBox = new HBox(10,izleziButton);
         exitBox.setAlignment(Pos.BOTTOM_LEFT);
         exitBox.setPadding(new Insets(10));
 
@@ -1927,8 +2167,24 @@ public class RestaurantApp extends Application {
             rightAdminResultTable.getItems().clear();
             rightAdminResultTable.getColumns().clear();
         });
+
+        adminfakturabtn.setOnAction(_ ->{
+            int vrabotenShifra = Integer.parseInt(rezultatiAdmin.getFirst()[8]);
+            int smetkaID = Integer.parseInt(rezultatiAdmin.getFirst()[7]);
+            admincreateBill(smetkaID, vrabotenShifra);
+            smetkaData.clear();
+        });
+        adminfiskalnabtn.setOnAction(_ -> {
+            int smetkaId = Integer.parseInt(rezultatiAdmin.getFirst()[7]);
+            changeTipSmetka(smetkaId);
+            adminfiskalnabtn.setDisable(true);
+            executeQuery(datefrom.getValue(),dateto.getValue(),timeFromField.getText(),timeToField.getText(),vrabotenComboBox.getValue().shifra,tipSmetkaComboBox.getValue());
+            leftAdminTable.setItems(smetkadataAdmin);
+            leftAdminTable.refresh();
+        });
+
         // Add all elements to the bottom section
-        bottomSection.getChildren().addAll(datetime, vrabotenartikli, smetkilayot,exitBox);
+        bottomSection.getChildren().addAll(datetime, vrabotenartikli, smetkilayot,pregledi,exitBox);
 
         return bottomSection;
     }
@@ -1940,6 +2196,9 @@ public class RestaurantApp extends Application {
         public Employee(String ime, String shifra) {
             this.ime = ime;
             this.shifra = shifra;
+        }
+        public int getShifra(){
+            return Integer.parseInt(shifra);
         }
         @Override
         public String toString() {
@@ -2165,47 +2424,57 @@ public class RestaurantApp extends Application {
 
     private void setupRightSmetkaTable() {
         rightAdminResultTable.getColumns().clear();
-
         // Create columns
         TableColumn<String[], String> artiklColumn = new TableColumn<>("Артикл");
-        TableColumn<String[], String> kolicinaColumn = new TableColumn<>("Количина");
-        artiklColumn.setPrefWidth(200);
-        kolicinaColumn.setPrefWidth(60);
-        TableColumn<String[], String> cenaColumn = new TableColumn<>("Цена");
-        cenaColumn.setPrefWidth(70);
-        TableColumn<String[], String> vkupnoColumn = new TableColumn<>("Вкупно");
-        vkupnoColumn.setPrefWidth(70);
-        TableColumn<String[], String> datumColumn = new TableColumn<>("Дата");
-        datumColumn.setPrefWidth(150);
-        TableColumn<String[], String> vremecolumm = new TableColumn<>("Време");
-        TableColumn<String[], String> imecolumm = new TableColumn<>("Име");
+        artiklColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.30)); // 30%
 
-        // Set cell value factories to bind the correct column data
+        TableColumn<String[], String> kolicinaColumn = new TableColumn<>("Количина");
+        kolicinaColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.10)); // 10%
+
+        TableColumn<String[], String> cenaColumn = new TableColumn<>("Цена");
+        cenaColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.10)); // 15%
+
+        TableColumn<String[], String> vkupnoColumn = new TableColumn<>("Вкупно");
+        vkupnoColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.15)); // 15%
+
+        TableColumn<String[], String> datumColumn = new TableColumn<>("Дата");
+        datumColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.18)); // 15%
+
+        TableColumn<String[], String> vremecolumm = new TableColumn<>("Време");
+        vremecolumm.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.14)); // 15%
+
+        // Set cell value factories
         artiklColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
         kolicinaColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[1]));
         cenaColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[2]));
         vkupnoColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[3]));
         datumColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[4]));
         vremecolumm.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[5]));
-        imecolumm.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[6]));
+
+        // Bind font size dynamically based on table width
+        rightAdminResultTable.styleProperty().bind(Bindings.concat("-fx-font-size: ",
+                rightAdminResultTable.widthProperty().divide(35).asString(), "px;"));
 
         // Add columns to the TableView
-        rightAdminResultTable.getColumns().addAll(artiklColumn, kolicinaColumn, cenaColumn, vkupnoColumn, datumColumn, vremecolumm,imecolumm);
+        rightAdminResultTable.getColumns().addAll(artiklColumn, kolicinaColumn, cenaColumn, vkupnoColumn, datumColumn, vremecolumm);
     }
+
 
     private void setupRightArtikliTable() {
         rightAdminResultTable.getColumns().clear();
 
         // Create columns
         TableColumn<String[], String> artiklColumn = new TableColumn<>("Артикл");
+        artiklColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.25)); // 30%
         TableColumn<String[], String> kolicinaColumn = new TableColumn<>("Количина");
-
-        artiklColumn.setPrefWidth(200);
-        kolicinaColumn.setPrefWidth(100);
-
+        kolicinaColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.25)); // 30%
         // Set cell value factories
         artiklColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
         kolicinaColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[1]));
+
+        // Bind font size dynamically based on table width
+        rightAdminResultTable.styleProperty().bind(Bindings.concat("-fx-font-size: ",
+                rightAdminResultTable.widthProperty().divide(35).asString(), "px;"));
 
         // Add columns to the TableView
         rightAdminResultTable.getColumns().addAll(artiklColumn, kolicinaColumn);
@@ -2215,13 +2484,13 @@ public class RestaurantApp extends Application {
 
         // Create columns
         TableColumn<String[], String> artiklColumn = new TableColumn<>("Артикл");
+        artiklColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.40)); // 30%
         TableColumn<String[], String> kolicinaColumn = new TableColumn<>("Количина");
+        kolicinaColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.20)); // 30%
         TableColumn<String[], String> vremeColumn = new TableColumn<>("Време");
+        vremeColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.20)); // 30%
         TableColumn<String[], String> masaColumn = new TableColumn<>("Маса");
-
-        artiklColumn.setPrefWidth(200);
-        kolicinaColumn.setPrefWidth(100);
-        masaColumn.setPrefWidth(100);
+        masaColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.15)); // 30%
 
         // Set cell value factories
         artiklColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
@@ -2229,6 +2498,9 @@ public class RestaurantApp extends Application {
         vremeColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[2]));
         masaColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[3]));
 
+        // Bind font size dynamically based on table width
+        rightAdminResultTable.styleProperty().bind(Bindings.concat("-fx-font-size: ",
+                rightAdminResultTable.widthProperty().divide(35).asString(), "px;"));
         // Add columns to the TableView
         rightAdminResultTable.getColumns().addAll(artiklColumn, kolicinaColumn,vremeColumn,masaColumn);
     }
@@ -2237,15 +2509,17 @@ public class RestaurantApp extends Application {
 
         // Create columns
         TableColumn<String[], String> ddvcolumn = new TableColumn<>("ДДВ %");
+        ddvcolumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.25)); // 30%
         TableColumn<String[], String> sumaddvcolumn = new TableColumn<>("Сума");
-
-        ddvcolumn.setPrefWidth(200);
-        sumaddvcolumn.setPrefWidth(100);
+        sumaddvcolumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.25)); // 30%
 
         // Set cell value factories
         ddvcolumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
         sumaddvcolumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[1]));
 
+        // Bind font size dynamically based on table width
+        rightAdminResultTable.styleProperty().bind(Bindings.concat("-fx-font-size: ",
+                rightAdminResultTable.widthProperty().divide(35).asString(), "px;"));
         // Add columns to the TableView
         rightAdminResultTable.getColumns().addAll(ddvcolumn, sumaddvcolumn);
     }
@@ -2418,7 +2692,7 @@ public class RestaurantApp extends Application {
         try {
             // SQL query with explicit type casting for date comparison
             String query = """
-                select a.Naziv,sn.Kolicina,a.Cena as cena,a.Cena*sn.Kolicina as vkupno,DATE(Datum) as datum,TO_CHAR(vreme, 'HH24:MI:SS') AS vreme,v.ime as ime
+                select a.Naziv,sn.Kolicina,a.Cena as cena,a.Cena*sn.Kolicina as vkupno,DATE(Datum) as datum,TO_CHAR(vreme, 'HH24:MI:SS') AS vreme,v.ime as ime,SmetkaId,s.vrabotenshifra as vrabotenshifra
                 from smetka as s
                 left outer join vraboten as v on s.vrabotenshifra = v.shifra
                 inner join stavkanasmetka as sn on s.Id = sn.SmetkaId
@@ -2447,6 +2721,8 @@ public class RestaurantApp extends Application {
                         rs.getString("datum"),
                         rs.getString("vreme"),
                         rs.getString("ime"),
+                        rs.getString("SmetkaId"),
+                        rs.getString("vrabotenshifra")
                 };
                 rezultatiAdmin.add(row);
             }
@@ -2454,7 +2730,6 @@ public class RestaurantApp extends Application {
             rs.close();
             ps.close();
             conn.close();
-
             rightAdminResultTable.setItems(rezultatiAdmin);
             rightAdminResultTable.refresh();
         } catch (SQLException e) {
