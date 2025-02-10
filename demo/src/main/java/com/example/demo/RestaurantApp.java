@@ -224,6 +224,10 @@ public class RestaurantApp extends Application {
         loadPreviousOrders(tn, employeeId);
         orderTable.setItems(AllData);
         TableView<String[]> availableArticlesTable;
+        double screenHeight = Screen.getPrimary().getVisualBounds().getHeight();
+        double screenWidth = Screen.getPrimary().getVisualBounds().getWidth();
+        double middleWidth = screenWidth * 0.20;
+
 
         // Create a SplitPane to divide the window into left and right sections
         SplitPane splitPane = new SplitPane();
@@ -242,25 +246,20 @@ public class RestaurantApp extends Application {
 
         Label imevraboten = new Label();
         imevraboten.setText("Вработен:" + ime + "       Маса:" + tn);
-        imevraboten.setStyle("-fx-font-size: 25;");
-        imevraboten.setAlignment(Pos.CENTER_LEFT);
-        imevraboten.setPrefHeight(30);
-        imevraboten.setMaxHeight(30);
 
-        // VBox for displaying the total price (will take 10% of the height)
-        HBox bottombox = new HBox(10);
-        // Set the rightBox to take full height available
-        bottombox.setStyle("-fx-pref-height: 30px");
-        bottombox.setPrefHeight(30);
-        bottombox.setMaxHeight(30);
+        HBox bottombox = new HBox(20);
+        bottombox.setPrefHeight(screenHeight * 0.05);
+        bottombox.setMaxHeight(screenHeight * 0.05);
+        bottombox.setMaxHeight(screenHeight * 0.05);
 
         HBox.setHgrow(imevraboten, Priority.ALWAYS);
         imevraboten.setMaxWidth(Double.MAX_VALUE);
 
-        totalPriceLabel.setStyle("-fx-font-size: 25;-fx-font-weight: bold;-fx-border-color: gray");
-        totalPriceLabel.setAlignment(Pos.BASELINE_RIGHT);
+        // Dynamic font size for labels
+        imevraboten.styleProperty().bind(Bindings.concat("-fx-font-size: ", screenWidth / 50, "px;"));
+        totalPriceLabel.styleProperty().bind(Bindings.concat("-fx-border-color: gray;-fx-font-weight: bold;-fx-font-size: ", screenWidth / 50, "px;"));
+        bottombox.setPadding(new Insets(0,20,0,15));
         bottombox.getChildren().addAll(imevraboten,totalPriceLabel);
-
         // Create middle section layout with input fields and buttons
         VBox middleBox = createMiddleSection(tn, employeeId);
         splitPane.getItems().addAll(availableArticlesTable, middleBox, rightBox);
@@ -863,7 +862,7 @@ public class RestaurantApp extends Application {
 
         VBox separator = new VBox(20);
         separator.setAlignment(Pos.BASELINE_LEFT);
-        separator.setPrefHeight(screenHeight*0.10);
+        separator.setPrefHeight(screenHeight*0.15);
 
         // Add all components to the VBox
         middleBox.getChildren().addAll(articleLabel, articleInputField, quantityLabel, quantityInputField, bottomButtonsBox4,separator, bottomButtonsBox,bottomButtonsBox2,bottomButtonsBox3);
