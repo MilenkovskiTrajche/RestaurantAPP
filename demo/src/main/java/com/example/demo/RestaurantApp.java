@@ -1,5 +1,6 @@
 package com.example.demo;
 
+import javafx.geometry.Rectangle2D;
 import javafx.scene.image.Image;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -21,6 +22,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.*;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Modality;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.scene.input.KeyCode;
 import javafx.stage.StageStyle;
@@ -53,11 +55,11 @@ public class RestaurantApp extends Application {
     private final Label totalPriceLabel = new Label("Вкупно: 0");
     private final TextField articleInputField = new TextField();
     private final TextField quantityInputField = new TextField();
-    private final Button addArticleButton = new Button("Додади");
-    private final Button escButton = new Button("ESC");
-    private final Button smetkaButton = new Button("F1|Фискална Сметка");
-    private final Button fakturasmetkaButton = new Button("F2|Фактура");
-    private final Button deleteButton = new Button("Delete|Избриши");
+//    private final Button addArticleButton = new Button("Додади");
+//    private final Button escButton = new Button("ESC");
+//    private final Button smetkaButton = new Button("F1|Фискална Сметка");
+//    private final Button fakturasmetkaButton = new Button("F2|Фактура");
+//    private final Button deleteButton = new Button("Delete|Избриши");
     public int roww = 8;
     public int coll = 0;
     private Stage articleStage = new Stage();
@@ -263,7 +265,7 @@ public class RestaurantApp extends Application {
         VBox middleBox = createMiddleSection(tn, employeeId);
         splitPane.getItems().addAll(availableArticlesTable, middleBox, rightBox);
         splitPane.setDividerPosition(0, 0.30); // 30% left section
-        splitPane.setDividerPosition(1, 0.70); // 70% right section
+        splitPane.setDividerPosition(1, 0.55); // 70% right section
         splitPane1.getItems().addAll(splitPane,bottombox);
         splitPane1.setOrientation(Orientation.VERTICAL);
         splitPane1.setDividerPosition(0, 0.80);
@@ -276,7 +278,7 @@ public class RestaurantApp extends Application {
         articleStage.setScene(scene);
         articleStage.setMaximized(true);
         articleInputField.requestFocus();
-        articleStage.show();  // Show the stage first
+        articleStage.show();// Show the stage first
     }
 
     private TableView<String[]> createAvailableArticlesTable() {
@@ -284,27 +286,22 @@ public class RestaurantApp extends Application {
         // Define columns for ID, Naziv, and Cena
         TableColumn<String[], String> idColumn = new TableColumn<>("ID");
         idColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[0]));
-        idColumn.setStyle("-fx-font-size: 20");
-        idColumn.setPrefWidth(60); // Set preferred width for ID column
-        idColumn.setMaxWidth(80); // Limit to 80px (3 digits max)
+        idColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.15)); // 30%
 
         TableColumn<String[], String> nazivColumn = new TableColumn<>("Артикл");
         nazivColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[1]));
-        nazivColumn.setStyle("-fx-font-size: 20");
-        nazivColumn.setMinWidth(170); // Make sure Naziv column has a minimum size
-        nazivColumn.setMaxWidth(300); // Max width for Naziv column (it can expand up to this)
-        nazivColumn.setPrefWidth(280); // Set preferred width for Naziv column
+        nazivColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.60)); // 30%
+
 
         TableColumn<String[], String> cenaColumn = new TableColumn<>("Цена");
         cenaColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[2]));
-        cenaColumn.setStyle("-fx-font-size: 20");
-        cenaColumn.setPrefWidth(60); // Set preferred width for Cena column
-        cenaColumn.setMaxWidth(80);
+        cenaColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.18)); // 30%
+
+        tableView.styleProperty().bind(Bindings.concat("-fx-font-size: ", tableView.widthProperty().divide(20).asString(), "px;"));
 
         tableView.getColumns().addAll(idColumn, nazivColumn, cenaColumn);
 
         updateAvailableArticlesTable(tableView);
-        tableView.maxWidth(400);
         return tableView;
     }
 
@@ -314,43 +311,32 @@ public class RestaurantApp extends Application {
 
             TableColumn<String[], String> idColumn = new TableColumn<>("ID");
             idColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[0]));
-            idColumn.setStyle("-fx-font-size: 14;-fx-alignment: center-left;");
-            idColumn.setPrefWidth(40); // Set preferred width for ID column
-            idColumn.setMaxWidth(50); // Limit to 80px (3 digits max)
+            //idColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.10)); // 30%
 
             TableColumn<String[], String> nazivColumn = new TableColumn<>("Артикл");
             nazivColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[1]));
-            nazivColumn.setStyle("-fx-font-size: 20");
-            nazivColumn.setMinWidth(160);
-            nazivColumn.setMaxWidth(190);
-            nazivColumn.setPrefWidth(190);
+            nazivColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.48)); // 30%
 
             TableColumn<String[], String> cenaColumn = new TableColumn<>("Цена");
             cenaColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[2]));
-            cenaColumn.setStyle("-fx-font-size: 18");
-            cenaColumn.setMinWidth(60);
-            cenaColumn.setMaxWidth(80);
+            cenaColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.15)); // 30%
 
             TableColumn<String[], String> kolicinaColumn = new TableColumn<>("Количина");
             kolicinaColumn.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue()[3])));
-            kolicinaColumn.setStyle("-fx-font-size: 18");
-            kolicinaColumn.setMinWidth(40);
-            kolicinaColumn.setMaxWidth(60);
-            kolicinaColumn.setPrefWidth(40);
+            kolicinaColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.10)); // 30%
 
             TableColumn<String[], String> vremeColumn = new TableColumn<>("Време");
             vremeColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[4]));  // Time is in the 5th position
-            vremeColumn.setStyle("-fx-font-size: 18");
-            vremeColumn.setMinWidth(80);
-            vremeColumn.setMaxWidth(80);
-            vremeColumn.setPrefWidth(80);
+            vremeColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.20)); // 30%
+
+            tableView.styleProperty().bind(Bindings.concat("-fx-font-size: ", tableView.widthProperty().divide(25).asString(), "px;"));
 
             // Add columns to the TableView
-            tableView.getColumns().addAll(idColumn, nazivColumn, cenaColumn, kolicinaColumn, vremeColumn);
+            //tableView.getColumns().addAll(idColumn, nazivColumn, cenaColumn, kolicinaColumn, vremeColumn);
+            tableView.getColumns().addAll(nazivColumn, cenaColumn, kolicinaColumn, vremeColumn);
 
             loadPreviousOrders(nm,employeeId);
             tableView.setItems(AllData);
-
             return tableView;
     }
 
@@ -358,17 +344,57 @@ public class RestaurantApp extends Application {
     private VBox createMiddleSection(String tn, int employeeId) {
         VBox middleBox = new VBox(10);
         middleBox.setStyle("-fx-padding: 10;");
-        middleBox.setMaxWidth(400);
+        // Get the screen size
+        double screenWidth = Screen.getPrimary().getVisualBounds().getWidth();
+        double screenHeight = Screen.getPrimary().getVisualBounds().getHeight();
+
+        // Calculate dynamic width (20% of screen width)
+        double middleWidth = screenWidth * 0.40;
+        middleBox.setPrefWidth(middleWidth);
+        middleBox.setMaxWidth(middleWidth);
+
         // Labels and input fields
         Label articleLabel = new Label("Внеси назив/шифра за артикл:");
+        articleLabel.setMaxWidth(middleWidth * 0.95);  // 95% of middle section width
+        articleLabel.setAlignment(Pos.CENTER_LEFT);
+        articleLabel.styleProperty().bind(Bindings.concat("-fx-font-weight: bold;;-fx-font-size: ", middleWidth / 50, "px;")); // Dynamic font
+
         articleInputField.setPromptText("назив/шифра");
-        articleInputField.setStyle("-fx-font-size: 20");
-        articleLabel.setStyle("-fx-font-weight: bold;-fx-font-size: 20");
+        articleInputField.setMaxWidth(middleWidth * 0.95);
+        articleInputField.setPrefHeight(screenHeight * 0.05);  // 5% of screen height
+        articleInputField.styleProperty().bind(Bindings.concat("-fx-font-size: ", middleWidth / 30, "px;"));
 
         Label quantityLabel = new Label("Внеси количина:");
+        quantityLabel.setMaxWidth(middleWidth * 0.95);
+        quantityLabel.setAlignment(Pos.CENTER_LEFT);
+        quantityLabel.styleProperty().bind(Bindings.concat("-fx-font-weight: bold;;-fx-font-size: ", middleWidth / 50, "px;"));
+
         quantityInputField.setPromptText("Количина");
-        quantityLabel.setStyle("-fx-font-weight: bold;-fx-font-size: 20");
-        quantityInputField.setStyle("-fx-font-size: 20");
+        quantityInputField.setMaxWidth(middleWidth * 0.95);
+        quantityInputField.setPrefHeight(screenHeight * 0.06); // 6% of screen height
+        quantityInputField.styleProperty().bind(Bindings.concat("-fx-font-size: ", middleWidth / 30, "px;"));
+
+        //buttons
+        Button addArticleButton = new Button("Додади");
+        Button escButton = new Button("ESC");
+        Button smetkaButton = new Button("F1|Фискална Сметка");
+        Button fakturasmetkaButton = new Button("F2|Фактура");
+        Button deleteButton = new Button("Delete|Избриши");
+        Button transferButton = new Button("F5|Префрли маса");
+        Button transferArticleButton = new Button("F4|Префрли артикл");
+        Button prefrlikelner = new Button("F10|Префрли келнер");
+
+        // Define button list for easy iteration
+        List<Button> buttons = Arrays.asList(
+                smetkaButton, fakturasmetkaButton, deleteButton,
+                addArticleButton, escButton, transferButton, transferArticleButton,prefrlikelner
+        );
+
+        // Apply styles dynamically
+        for (Button button : buttons) {
+            button.setMaxWidth(middleWidth * 0.95);
+            button.styleProperty().bind(Bindings.concat("-fx-font-size: ", middleWidth / 40, "px;"));
+        }
 
         quantityInputField.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ENTER) {
@@ -382,9 +408,6 @@ public class RestaurantApp extends Application {
         Platform.runLater(articleInputField::requestFocus);
         setEnterKeyNavigation(articleInputField,quantityInputField);
 
-        // Buttons
-        Button transferButton = new Button("F5|Префрли маса");
-        Button transferArticleButton = new Button("F4|Префрли артикл");
         // Add listener to update table on search input
         articleInputField.textProperty().addListener((observable, oldValue, newValue) -> {
             updateAvailableArticlesSearch(newValue);
@@ -459,7 +482,7 @@ public class RestaurantApp extends Application {
         addArticleButton.setOnAction(_ -> {
             Platform.runLater(articleInputField::requestFocus);
             onAddArticle(tn, employeeId);});
-        addArticleButton.setStyle("-fx-font-size: 15;-fx-alignment: center;");
+        //addArticleButton.setStyle("-fx-font-size: 15;-fx-alignment: center;");
 
         escButton.setOnAction(_ -> {
             tableGrid.getChildren().clear();
@@ -490,8 +513,8 @@ public class RestaurantApp extends Application {
                 orderDataPrintShank.clear();
             }
             articleStage.close()
-        ;});
-        escButton.setAlignment(Pos.BOTTOM_CENTER);
+            ;});
+        //escButton.setAlignment(Pos.BOTTOM_CENTER);
 
         // Smetka Button
         smetkaButton.setOnAction(_ -> {
@@ -621,7 +644,7 @@ public class RestaurantApp extends Application {
         });
 
         //Префрли маса button
-        transferButton.setAlignment(Pos.CENTER_LEFT);
+        //transferButton.setAlignment(Pos.CENTER_LEFT);
         transferButton.setOnAction(_ -> {
             if(AllData.isEmpty()){
                 showAlertInformation("Нема нарачки за да се префрлат!");
@@ -661,7 +684,7 @@ public class RestaurantApp extends Application {
         });
 
         //префрли артикл button
-        transferArticleButton.setAlignment(Pos.CENTER_LEFT);
+        //transferArticleButton.setAlignment(Pos.CENTER_LEFT);
         transferArticleButton.setOnAction(_ -> {
             if (AllData.isEmpty()) {
                 showAlertInformation("Нема нарачки за префрлање!");
@@ -741,7 +764,6 @@ public class RestaurantApp extends Application {
             });
         });
 
-        Button prefrlikelner = new Button("F10|Префрли келнер");
         prefrlikelner.setOnAction(_ -> {
             if (AllData.isEmpty()) {
                 showAlertInformation("Нема нарачки за префрлање!");
@@ -814,18 +836,37 @@ public class RestaurantApp extends Application {
 
         HBox bottomButtonsBox2 = new HBox(20);  // 20px spacing between buttons
         bottomButtonsBox2.setAlignment(Pos.BASELINE_LEFT);  // Align buttons at the center
-        bottomButtonsBox2.getChildren().addAll(transferArticleButton,transferButton,deleteButton);
+        transferArticleButton.prefWidthProperty().bind(bottomButtonsBox2.widthProperty().divide(2));
+        transferButton.prefWidthProperty().bind(bottomButtonsBox2.widthProperty().divide(2));
+        bottomButtonsBox2.getChildren().addAll(transferArticleButton,transferButton);
+
+        HBox bottomButtonsBox3 = new HBox(20);  // 20px spacing between buttons
+        bottomButtonsBox3.setAlignment(Pos.BASELINE_LEFT);  // Align buttons at the center
+        prefrlikelner.prefWidthProperty().bind(bottomButtonsBox3.widthProperty().divide(2));
+        deleteButton.prefWidthProperty().bind(bottomButtonsBox3.widthProperty().divide(2));
+        bottomButtonsBox3.getChildren().addAll(prefrlikelner,deleteButton);
+
+        HBox bottomButtonsBox4 = new HBox(20);  // 20px spacing between buttons
+        bottomButtonsBox4.setAlignment(Pos.BASELINE_LEFT);  // Align buttons at the center
+        addArticleButton.prefWidthProperty().bind(bottomButtonsBox4.widthProperty().divide(2));
+        escButton.prefWidthProperty().bind(bottomButtonsBox4.widthProperty().divide(2));
+        bottomButtonsBox4.getChildren().addAll(addArticleButton,escButton);
 
         Platform.runLater(articleInputField::requestFocus);
         // Bottom button layout using HBox
         HBox bottomButtonsBox = new HBox(20);  // 20px spacing between buttons
         bottomButtonsBox.setAlignment(Pos.BASELINE_LEFT);  // Align buttons at the center
-
+        smetkaButton.prefWidthProperty().bind(bottomButtonsBox.widthProperty().divide(2));
+        fakturasmetkaButton.prefWidthProperty().bind(bottomButtonsBox.widthProperty().divide(2));
         // Add buttons to the bottom section
-        bottomButtonsBox.getChildren().addAll(smetkaButton,fakturasmetkaButton, prefrlikelner);
+        bottomButtonsBox.getChildren().addAll(smetkaButton,fakturasmetkaButton);
+
+        VBox separator = new VBox(20);
+        separator.setAlignment(Pos.BASELINE_LEFT);
+        separator.setPrefHeight(screenHeight*0.10);
 
         // Add all components to the VBox
-        middleBox.getChildren().addAll(articleLabel, articleInputField, quantityLabel, quantityInputField, addArticleButton, bottomButtonsBox,bottomButtonsBox2,escButton);
+        middleBox.getChildren().addAll(articleLabel, articleInputField, quantityLabel, quantityInputField, bottomButtonsBox4,separator, bottomButtonsBox,bottomButtonsBox2,bottomButtonsBox3);
 
         return middleBox;
     }
@@ -1425,7 +1466,6 @@ public class RestaurantApp extends Application {
         } else {
             showAlert("Не е пронајден артикл.");
         }
-
         // Clear input fields
         articleInputField.clear();
         quantityInputField.clear();
