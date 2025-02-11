@@ -1,6 +1,6 @@
 package com.example.demo;
 
-import javafx.geometry.Rectangle2D;
+
 import javafx.scene.image.Image;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -21,7 +21,6 @@ import javafx.scene.control.TextField;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.*;
 import javafx.scene.text.TextAlignment;
-import javafx.stage.Modality;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.scene.input.KeyCode;
@@ -30,7 +29,6 @@ import javafx.beans.binding.Bindings;
 
 import java.sql.*;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -55,11 +53,6 @@ public class RestaurantApp extends Application {
     private final Label totalPriceLabel = new Label("Вкупно: 0");
     private final TextField articleInputField = new TextField();
     private final TextField quantityInputField = new TextField();
-//    private final Button addArticleButton = new Button("Додади");
-//    private final Button escButton = new Button("ESC");
-//    private final Button smetkaButton = new Button("F1|Фискална Сметка");
-//    private final Button fakturasmetkaButton = new Button("F2|Фактура");
-//    private final Button deleteButton = new Button("Delete|Избриши");
     public int roww = 8;
     public int coll = 0;
     private Stage articleStage = new Stage();
@@ -80,100 +73,105 @@ public class RestaurantApp extends Application {
         tableGrid.setVgap(5);//okolu masite da ima prazno mesto
         getTabels();
         handleLogin(primaryStage);//login screen prikazi
-        primaryStage.getIcons().add(new Image(getClass().getResourceAsStream("/images/paparaciloginbg.png")));
+        primaryStage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/paparaciloginbg.png"))));
     }
     private void handleLogin(Stage primaryStage) {
-        VBox leftPane = new VBox(20);
-        leftPane.setPadding(new Insets(20, 100, 20, 20));
-        // Make the fields bigger
+        // Get screen size
+        double screenWidth = Screen.getPrimary().getVisualBounds().getWidth();
+        double screenHeight = Screen.getPrimary().getVisualBounds().getHeight();
+
+        // Left panel
+        VBox leftPane = new VBox(screenHeight * 0.03); // Dynamic spacing
+        leftPane.setPadding(new Insets(screenHeight * 0.02, screenWidth * 0.05, screenHeight * 0.02, screenWidth * 0.02));
+
+        // Labels and Input Fields
         Label passwordLabel = new Label("Шифра");
         passwordField = new PasswordField();
-        passwordLabel.setStyle("-fx-font-size: 40");
-        passwordField.setPrefSize(200, 50);
-        passwordField.setStyle("-fx-font-size: 50;-fx-alignment: center");
-        setMaxInputLength(passwordField,3);//3brojki shifra
+        passwordLabel.styleProperty().bind(Bindings.concat("-fx-font-size: ", screenWidth / 30, "px;"));
+        passwordField.setPrefSize(screenWidth * 0.15, screenHeight * 0.08);
+        passwordField.styleProperty().bind(Bindings.concat("-fx-font-size: ", screenWidth / 25, "px;"));
+        setMaxInputLength(passwordField, 3);
+
         Label tableLabel = new Label("Маса");
         tableField = new TextField();
-        tableLabel.setStyle("-fx-font-size: 40;");
-        tableField.setPrefSize(200, 50);
-        tableField.setStyle("-fx-font-size: 40;-fx-alignment: center");
+        tableLabel.styleProperty().bind(Bindings.concat("-fx-font-size: ", screenWidth / 30, "px;"));
+        tableField.setPrefSize(screenWidth * 0.15, screenHeight * 0.08);
+        tableField.styleProperty().bind(Bindings.concat("-fx-font-size: ", screenWidth / 28, "px;"));
+        setMaxInputLength(tableField, 5);
+
         leftPane.getChildren().addAll(passwordLabel, passwordField, tableLabel, tableField);
-        setEnterKeyNavigation(passwordField, tableField);//enter -> tablefield te nosi
-        setMaxInputLength(tableField,5);
+        setEnterKeyNavigation(passwordField, tableField);
 
         // Vertical Line Separator
         Region separator = new Region();
-        separator.setPrefWidth(5); // Set width for the vertical line
+        separator.setPrefWidth(screenWidth * 0.005);
         separator.setStyle("-fx-background-color: black;");
 
-        // Handle "Enter" key press on Table field
+        // Handle Enter key for tableField
         tableField.setOnAction(_ -> {
             String enteredTable = tableField.getText();
             try {
-                int employeeid = Integer.parseInt(passwordField.getText()); // Attempt to parse input
-                if (employeeid < 0) {
-                    return; // Exit if the number is negative
-                }
-                // Proceed with valid tn
+                int employeeId = Integer.parseInt(passwordField.getText());
+                if (employeeId < 0) return;
             } catch (NumberFormatException e) {
                 showAlert("Шифрата мора да биди број!");
-                passwordField.setText("");
-                tableField.setText("");
-                Platform.runLater(passwordField::requestFocus);
+                resetFields();
                 return;
             }
-            if(checkAdmin(passwordField.getText()) && enteredTable.isEmpty()){
+
+            if (checkAdmin(passwordField.getText()) && enteredTable.isEmpty()) {
                 showAdminPanel();
-                tableField.setText("");
-                passwordField.setText("");
-                Platform.runLater(passwordField::requestFocus);
+                resetFields();
                 return;
             }
+
             try {
-                int tn = Integer.parseInt(enteredTable); // Attempt to parse input
+                int tn = Integer.parseInt(enteredTable);
                 if (tn < 0) {
                     tableField.clear();
                     Platform.runLater(tableField::requestFocus);
-                    return; // Exit if the number is negative
+                    return;
                 }
-                // Proceed with valid tn
             } catch (NumberFormatException e) {
                 showAlert("Масата мора да биди број!");
-                tableField.setText("");
-                Platform.runLater(tableField::requestFocus);
-                return; // Exit if input is not a valid number
+                resetFields();
+                return;
             }
 
-            if(checkPassword(passwordField.getText())) {
-                handleTableEntry(enteredTable,passwordField.getText());
-                tableField.setText("");
-                passwordField.setText("");
-                Platform.runLater(passwordField::requestFocus);
-            }
-            if(!checkPassword(passwordField.getText())) {
-                tableField.setText("");
-                passwordField.setText("");
-                Platform.runLater(passwordField::requestFocus);
+            if (checkPassword(passwordField.getText())) {
+                handleTableEntry(enteredTable, passwordField.getText());
+                resetFields();
+            } else {
+                resetFields();
             }
         });
 
         // Align right panel with tables
-        HBox rightPane = new HBox(10, separator, tableGrid);
+        HBox rightPane = new HBox(screenWidth * 0.005, separator, tableGrid);
         rightPane.setAlignment(Pos.TOP_RIGHT);
-        rightPane.setPadding(new Insets(20, 20, 20, 50));
+        rightPane.setPadding(new Insets(screenHeight * 0.02, screenWidth * 0.02, screenHeight * 0.02, screenWidth * 0.03));
+
         leftPane.setAlignment(Pos.CENTER);
 
         // Combine Left and Right Panels
-        HBox mainLayout = new HBox(10, leftPane, rightPane);
-        mainLayout.setPadding(new Insets(20));
+        HBox mainLayout = new HBox(screenWidth * 0.01, leftPane, rightPane);
+        mainLayout.setPadding(new Insets(screenHeight * 0.02));
 
         // Create Scene and Stage
         Scene scene = new Scene(mainLayout);
         primaryStage.setTitle("Папараци2");
         primaryStage.setScene(scene);
-        primaryStage.setMaximized(true); // Maximize the window
+        primaryStage.setMaximized(true);
         primaryStage.show();
     }
+
+    // Helper method to reset fields and focus back on password field
+    private void resetFields() {
+        passwordField.setText("");
+        tableField.setText("");
+        Platform.runLater(passwordField::requestFocus);
+    }
+
 
     // Handle table entry after pressing Enter
     private void handleTableEntry(String tableNumber, String ps) {
@@ -205,7 +203,7 @@ public class RestaurantApp extends Application {
                     ime = imee;
                     existingTables.add(shifra + ":" + masaa);
                     addTableButtonToGrid(String.valueOf(masaa), coll, roww,shifra);
-                    if (coll >= 4) {
+                    if (coll >= 5) {
                         coll = 0;
                         roww++;
                     } else {
@@ -226,8 +224,6 @@ public class RestaurantApp extends Application {
         TableView<String[]> availableArticlesTable;
         double screenHeight = Screen.getPrimary().getVisualBounds().getHeight();
         double screenWidth = Screen.getPrimary().getVisualBounds().getWidth();
-        double middleWidth = screenWidth * 0.20;
-
 
         // Create a SplitPane to divide the window into left and right sections
         SplitPane splitPane = new SplitPane();
@@ -408,11 +404,9 @@ public class RestaurantApp extends Application {
         setEnterKeyNavigation(articleInputField,quantityInputField);
 
         // Add listener to update table on search input
-        articleInputField.textProperty().addListener((observable, oldValue, newValue) -> {
-            updateAvailableArticlesSearch(newValue);
-        });
+        articleInputField.textProperty().addListener((_, _, newValue) -> updateAvailableArticlesSearch(newValue));
 
-        orderTable.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
+        orderTable.getSelectionModel().selectedItemProperty().addListener((_, _, newValue) -> {
             if (newValue != null) {  // Ensure that an item is selected
                 // Move focus to the articleInputField when a row is selected in the orderTable
                 Platform.runLater(articleInputField::requestFocus);
@@ -491,7 +485,7 @@ public class RestaurantApp extends Application {
             if(!AllData.isEmpty() && !existingTables.contains(employeeId+":"+tn)) {
                 existingTables.add(employeeId + ":" + tn);
                 addTableButtonToGrid(tn, coll, roww,employeeId);
-                if (coll >= 4) {
+                if (coll >= 5) {
                     coll = 0;
                     roww++;
                 } else {
@@ -585,7 +579,7 @@ public class RestaurantApp extends Application {
                 if (response == ButtonType.OK) {
                     int articleId = Integer.parseInt(selectedItem[0]);
                     int quantity = Integer.parseInt(selectedItem[3]);
-                    int orderId = 0;
+                    int orderId;
                     try {
                         orderId = getOrderIdForSelectedItem(employeeId, Integer.parseInt(tn));
                     } catch (SQLException e) {
@@ -601,9 +595,9 @@ public class RestaurantApp extends Application {
                             stmt.executeUpdate();
                         }
                     } catch (SQLException e) {
-                        e.printStackTrace(); // Handle the SQL exception
+                        showAlert(e.getMessage());
                     }
-                    int snid = 0;
+                    int snid;
                     try {
                         snid = getStavkaNarackaId(employeeId,orderId,articleId,quantity);
                     } catch (SQLException e) {
@@ -676,8 +670,7 @@ public class RestaurantApp extends Application {
                 } catch (NumberFormatException e) {
                     showAlert("Внесете валиден број за маса.");
                 } catch (SQLException e) {
-                    showAlert("Настана грешка при трансферот на нарачките.");
-                    e.printStackTrace();
+                    showAlert("Настана грешка при трансферот на нарачките.\n" +e.getMessage());
                 }
             });
         });
@@ -725,7 +718,7 @@ public class RestaurantApp extends Application {
                             int quantity = Integer.parseInt(selectedItem[3]); // Assuming Quantity is in the last column
 
                             // Get the current order ID
-                            int currentOrderId = 0;
+                            int currentOrderId;
                             try {
                                 currentOrderId = getOrderIdForSelectedItem(employeeId, Integer.parseInt(tn));
                             } catch (SQLException e) {
@@ -750,8 +743,7 @@ public class RestaurantApp extends Application {
                                     escButton.fire();
                                 }
                             } catch (SQLException e) {
-                                showAlert("Настана грешка при префрлувањето на артиклот.");
-                                e.printStackTrace();
+                                showAlert("Настана грешка при префрлувањето на артиклот.\n"+e.getMessage());
                             }
                         } else {
                             System.out.println("Откажано префрлување.");
@@ -1055,7 +1047,7 @@ public class RestaurantApp extends Application {
             try (Connection conn = DatabaseConnection.getConnection()) {
                 conn.rollback();  // Rollback transaction on failure
             } catch (SQLException rollbackEx) {
-                rollbackEx.printStackTrace();
+                showAlert(rollbackEx.getMessage());
             }
 
             // Show an error message
@@ -1152,7 +1144,7 @@ public class RestaurantApp extends Application {
             try (Connection conn = DatabaseConnection.getConnection()) {
                 conn.rollback();  // Rollback transaction on failure
             } catch (SQLException rollbackEx) {
-                rollbackEx.printStackTrace();
+                showAlert(rollbackEx.getMessage());
             }
 
             // Show an error message
@@ -1235,8 +1227,7 @@ public class RestaurantApp extends Application {
             conn.commit();
             showAlertInformation("Успешно ажурирана шифра на вработен.");
         } catch (Exception e) {
-            e.printStackTrace();
-            showAlert("Грешка при ажурирање на шифрата на вработен.");
+            showAlert("Грешка при ажурирање на шифрата на вработен.\n" + e.getMessage());
         }
     }
 
@@ -1379,63 +1370,6 @@ public class RestaurantApp extends Application {
             throw new SQLException("Error transferring orders", ex);
         }
     }
-
-    private void showBillPopup(ObservableList<String[]> smetkaData,int totalPrice,String title,String tn) {
-        // Create TableView
-        TableView<String[]> tableView = new TableView<>();
-        tableView.setItems(smetkaData);
-        tableView.setStyle("-fx-font-size: 18px;");
-
-        tableView.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);  //
-
-
-        // Create columns
-        TableColumn<String[], String> articleColumn = new TableColumn<>("Артикли");
-        articleColumn.setCellValueFactory(cellData ->
-                new SimpleStringProperty(cellData.getValue()[0])); // Index 0: Articles
-
-        TableColumn<String[], String> quantityColumn = new TableColumn<>("Количина");
-        quantityColumn.setCellValueFactory(cellData ->
-                new SimpleStringProperty(cellData.getValue()[1])); // Index 1: Quantity
-
-        TableColumn<String[], String> priceColumn = new TableColumn<>("Цена Артикл");
-        priceColumn.setCellValueFactory(cellData ->
-                new SimpleStringProperty(cellData.getValue()[2])); // Index 2: Price
-
-        TableColumn<String[], String> sumPriceColumn = new TableColumn<>("Цена Вкупно");
-        sumPriceColumn.setCellValueFactory(cellData ->
-                new SimpleStringProperty(cellData.getValue()[3])); // Index 3: Total Price
-
-        // Add columns to the TableView
-        tableView.getColumns().addAll(articleColumn, quantityColumn, priceColumn, sumPriceColumn);
-        tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        // Create the layout
-        Label totalPriceLabel = new Label("Вкупно: " + totalPrice);
-        totalPriceLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-
-        Label imeVraboten = new Label("Вработен: " + ime);
-        imeVraboten.setStyle("-fx-font-size: 16px;");
-
-        Label masabroj = new Label("Маса: " + tn);
-        masabroj.setStyle("-fx-font-size: 16px");
-
-        Label data = new Label("Дата: " + LocalDateTime.now().getHour()+":"+LocalDateTime.now().getMinute()+" - " + LocalDateTime.now().getDayOfMonth() + "/" + LocalDateTime.now().getMonthValue()+ "/" + LocalDateTime.now().getYear());
-        data.setStyle("-fx-font-size: 16px");
-
-        VBox layout = new VBox(10, tableView, totalPriceLabel,imeVraboten,masabroj,data);
-        layout.setPadding(new Insets(10));
-
-        // Create and configure the new stage
-        Stage popupStage = new Stage();
-        popupStage.setTitle(title);
-        popupStage.initModality(Modality.APPLICATION_MODAL); // x,_ da gi nema
-        Scene scene = new Scene(layout, 400, 600);
-        popupStage.setScene(scene);
-
-        // Show the popup window
-        popupStage.showAndWait();
-    }
-
     // Handle adding article to the order from the input fields
     private void onAddArticle(String tn, int employeeId) {
         String articleInput = articleInputField.getText().trim();
@@ -1519,7 +1453,6 @@ public class RestaurantApp extends Application {
         return now.format(DateTimeFormatter.ofPattern("HH:mm:ss"));  // Format it as HH:mm
     }
     private boolean checktipShankArtikl(int idArtikl) {
-        int vk_cena = 0;
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement("""
                      select tip from artikl where id = ?;
@@ -1567,10 +1500,6 @@ public class RestaurantApp extends Application {
 
     private void updateTotalPrice(String tn,int employeeId) {
         int vk_cena = getTotalPrice(tn, employeeId);
-        int totalPrice = 0;
-        for (String[] article : orderData) {
-            totalPrice += Integer.parseInt(article[2]) * Integer.parseInt(article[3]);  // Price * Quantity
-        }
         totalPriceLabel.setText("Вкупно: " + vk_cena);
     }
 
@@ -1780,8 +1709,13 @@ public class RestaurantApp extends Application {
     // Add new table button to the grid
     private void addTableButtonToGrid(String tableNumber, int col, int row,int employeeid) {
         Button newTableButton = new Button(tableNumber);
-        newTableButton.setPrefSize(150, 50);// Set size for the new table button
-        newTableButton.setStyle("-fx-font-size: 15px;-fx-border-color: black");
+        // Get screen size
+        double screenWidth = Screen.getPrimary().getVisualBounds().getWidth();
+        double screenHeight = Screen.getPrimary().getVisualBounds().getHeight();
+        double btnwidth = screenWidth * 0.70;
+
+        newTableButton.setPrefSize(btnwidth/6, screenHeight * 0.06);// Set size for the new table button
+        newTableButton.styleProperty().bind(Bindings.concat("-fx-border-color: black;-fx-font-size: ", screenWidth / 60, "px;"));
         String username = ime;
         String btnname=username+":"+tableNumber;
         newTableButton.setText(username + ":" + tableNumber);
@@ -1959,6 +1893,7 @@ public class RestaurantApp extends Application {
         adminfiskalnabtn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.25));
         adminfiskalnabtn.styleProperty().bind(Bindings.concat("-fx-font-size: ", rightAdminResultTable.widthProperty().divide(40).asString(), "px;"));
 
+        doludesno.setPadding(new Insets(5,10,5,10));
         doludesno.getChildren().addAll(adminfiskalnabtn, adminfakturabtn,spacer,totalPriceLabel);
 
         rightSplitPane.getItems().addAll(rightAdminResultTable,doludesno);
@@ -2137,7 +2072,8 @@ public class RestaurantApp extends Application {
             if (selectedItem != null) {
                 executeQueryResult(selectedItem[1]);
                 totalPriceLabel.setText("Вкупно: " + selectedItem[3]);
-                totalPriceLabel.setStyle("-fx-border-color: gray;-fx-font-size: 27;-fx-font-weight: bold;-fx-padding: 5");
+                totalPriceLabel.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.25));
+                totalPriceLabel.styleProperty().bind(Bindings.concat("-fx-border-color: gray;-fx-font-weight: bold;-fx-font-size: ", rightAdminResultTable.widthProperty().divide(30), "px;"));
                 if (selectedItem[6].equals("фискална")) {
                     adminfakturabtn.setDisable(false);
                 }
@@ -2236,9 +2172,7 @@ public class RestaurantApp extends Application {
             this.ime = ime;
             this.shifra = shifra;
         }
-        public int getShifra(){
-            return Integer.parseInt(shifra);
-        }
+
         @Override
         public String toString() {
             return ime; // Display only the name in the ComboBox
@@ -2255,7 +2189,7 @@ public class RestaurantApp extends Application {
                 employees.add(new Employee(rs.getString("ime"), rs.getString("shifra")));
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            showAlert(e.getMessage());
         }
         return employees;
     }
@@ -2304,7 +2238,7 @@ public class RestaurantApp extends Application {
 
             // Base query
             String query = """
-            SELECT smetka.vrabotenime as ime, id, masa, Vkupno, Date(Datum) as datum, TO_CHAR(Datum, 'HH24:MI:SS') as vreme, Smetka.tip
+            SELECT smetka.vrabotenime as ime, id, masa, Vkupno, TO_CHAR(Datum, 'DD-MM-YYYY') as datum, TO_CHAR(Datum, 'HH24:MI:SS') as vreme, Smetka.tip
             FROM smetka
                      left outer join vraboten AS v ON smetka.VrabotenShifra = v.Shifra
             WHERE (Datum >= ?::timestamp + ?::time)
@@ -2336,7 +2270,8 @@ public class RestaurantApp extends Application {
             // Set conditional parameters
             int parameterIndex = 5;
             if (filterByTipSmetka) {
-                ps.setString(parameterIndex++, tipSmetka); // Add tipSmetka to the query
+                ps.setString(parameterIndex, tipSmetka); // Add tipSmetka to the query
+                parameterIndex++;
             }
             if (filterByShifrav) {
                 ps.setInt(parameterIndex++, Integer.parseInt(shifrav)); // Add shifrav to the query
@@ -2369,8 +2304,7 @@ public class RestaurantApp extends Application {
             leftAdminTable.setItems(smetkadataAdmin);
             leftAdminTable.refresh();
         } catch (SQLException e) {
-            e.printStackTrace();
-            // Handle exceptions (e.g., show an alert or log an error)
+            showAlert(e.getMessage());
         }
     }
 
@@ -2425,10 +2359,12 @@ public class RestaurantApp extends Application {
             // Set conditional parameters
             int parameterIndex = 5;
             if (filterByTipSmetka) {
-                ps.setString(parameterIndex++, tipSmetka); // Add tipSmetka to the query
+                ps.setString(parameterIndex, tipSmetka); // Add tipSmetka to the query
+                parameterIndex++;
             }
             if (filterByShifrav) {
-                ps.setInt(parameterIndex++, Integer.parseInt(vrabotenshifra)); // Add shifrav to the query
+                ps.setInt(parameterIndex, Integer.parseInt(vrabotenshifra)); // Add shifrav to the query
+                parameterIndex++;
             }
 
             // Execute query
@@ -2455,8 +2391,7 @@ public class RestaurantApp extends Application {
             rightAdminResultTable.setItems(rezultatiAdmin);
             rightAdminResultTable.refresh();
         } catch (SQLException e) {
-            e.printStackTrace();
-            // Handle exceptions (show an alert or log the error)
+            showAlert(e.getMessage());
         }
     }
 
@@ -2644,8 +2579,7 @@ public class RestaurantApp extends Application {
             rightAdminResultTable.setItems(rezultatiAdmin);
             rightAdminResultTable.refresh();
         } catch (SQLException e) {
-            e.printStackTrace();
-            // Handle exceptions (show an alert or log the error)
+            showAlert(e.getMessage());
         }
     }
 
@@ -2722,8 +2656,7 @@ public class RestaurantApp extends Application {
             rightAdminResultTable.setItems(rezultatiAdmin);
             rightAdminResultTable.refresh();
         } catch (SQLException e) {
-            e.printStackTrace();
-            // Handle exceptions (show an alert or log the error)
+            showAlert(e.getMessage());
         }
     }
 
@@ -2772,8 +2705,7 @@ public class RestaurantApp extends Application {
             rightAdminResultTable.setItems(rezultatiAdmin);
             rightAdminResultTable.refresh();
         } catch (SQLException e) {
-            e.printStackTrace();
-            // Handle exceptions (show an alert or log error)
+            showAlert(e.getMessage());
         }
     }
 
@@ -2870,7 +2802,7 @@ public class RestaurantApp extends Application {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            showAlert(e.getMessage());
         }
         double total = fiscalTotal + invoiceTotal;
 
@@ -2885,6 +2817,15 @@ public class RestaurantApp extends Application {
         gridPane.setVgap(10);
         gridPane.setStyle("-fx-border-color: black; -fx-border-width: 2; -fx-padding: 10;");
 
+        //printlayoutCLONE
+        Label printtitleLabel = new Label("Преглед по вработен - " + employeeName);
+        // Add sections with borders for the table
+        GridPane printdetailsPane = createSection("Детали за временски период",
+                new String[]{"Датум од:", dateFrom.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")) + "       до:   " + dateTo.format(DateTimeFormatter.ofPattern("dd-MM-yyyy"))},
+                new String[]{"Време од:", timeFrom + "            до:   " + timeTo});
+        GridPane printfiscalPane = createSection("Фискален промет:   " + String.format("%.2f",fiscalTotal));
+        GridPane printinvoicePane = createSection("Фактура промет:     " + String.format("%.2f", invoiceTotal));
+        GridPane printtotalPane = createSection("Вкупен промет:       " + String.format("%.2f", total));
         // Add a title
         Label titleLabel = new Label("Преглед по вработен - " + employeeName);
         titleLabel.setStyle("-fx-font-size: 18;-fx-font-weight: bold;");
@@ -2893,7 +2834,7 @@ public class RestaurantApp extends Application {
 
         // Add sections with borders for the table
         GridPane detailsPane = createSection("Детали за временски период",
-                new String[]{"Датум од:", dateFrom.toString() + "       до:   " + dateTo.toString()},
+                new String[]{"Датум од:", dateFrom.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")) + "       до:   " + dateTo.format(DateTimeFormatter.ofPattern("dd-MM-yyyy"))},
                 new String[]{"Време од:", timeFrom + "            до:   " + timeTo});
         GridPane fiscalPane = createSection("Фискален промет:   " + String.format("%.2f",fiscalTotal));
         GridPane invoicePane = createSection("Фактура промет:     " + String.format("%.2f", invoiceTotal));
@@ -2931,22 +2872,37 @@ public class RestaurantApp extends Application {
                 formattedTime = timestamp.substring(11, 19); // Get the time part from the string (position 11 to 18)
 
             } catch (IndexOutOfBoundsException e) {
-                e.printStackTrace(); // Handle extraction errors if any
+                showAlert(e.getMessage());
                 formattedTime = item[2]; // Use the original value if extraction fails
             }
             String itemDetails = String.format("%s | -%s | %s | Маса: %s",
                     item[0], item[1], formattedTime, item[3]);
 
             Label itemLabel = new Label(itemDetails);
-            itemLabel.setStyle("-fx-font-size: 12;"); // Style each label
+            itemLabel.setStyle("-fx-font-size: 14;"); // Style each label
             deletedItemsSection.getChildren().add(itemLabel);
         }
+        Button printButton = new Button("Печати");
+        printButton.setAlignment(Pos.BOTTOM_LEFT);
         // Combine all elements in the layout
         VBox layout = new VBox();
         layout.setSpacing(5); // Add spacing between sections
-        layout.setStyle("-fx-font-size: 14;");
+        layout.setStyle("-fx-font-size: 16;");
         layout.setPadding(new Insets(10));
-        layout.getChildren().addAll(titleLabel, detailsPane, fiscalPane, invoicePane, totalPane, deletedItemsSection);
+        layout.getChildren().addAll(titleLabel, detailsPane, fiscalPane, invoicePane, totalPane, deletedItemsSection,printButton);
+
+        VBox printlayout = new VBox();
+        printlayout.setSpacing(5); // Add spacing between sections
+        printlayout.setStyle("-fx-font-size: 16;");
+        printlayout.setPadding(new Insets(10));
+        printlayout.getChildren().addAll(printtitleLabel, printdetailsPane, printfiscalPane, printinvoicePane, printtotalPane);
+        printlayout.setAlignment(Pos.CENTER);
+
+        printButton.setOnAction(_ ->{
+            PrinterService printerService = new PrinterService();
+            printerService.printNode(printlayout,1);
+        });
+
         // Wrap the layout in a ScrollPane
         ScrollPane scrollPane = new ScrollPane(layout);
         scrollPane.setFitToWidth(true); // Ensure the content stretches to the width of the ScrollPane

@@ -90,14 +90,14 @@ public class PrinterService {
         previewStage.show();
 
         // Uncomment the next line to print without preview
-        // printNode(layout,countArticls);
+        //printNode(layout,countArticls);
     }
 
-    private void printNode(Node node, int numberOfArticles) {
+    public void printNode(Node node, int numberOfArticles) {
         Printer printer = Printer.getDefaultPrinter();
         PrinterJob job = PrinterJob.createPrinterJob();
 
-        if (job != null && job.showPrintDialog(null)) {
+        if (job != null) {
             // Get the printable area
             PageLayout pageLayout = printer.createPageLayout(Paper.A4, PageOrientation.PORTRAIT, 10, 10, 10, 10);
             double printableWidth = pageLayout.getPrintableWidth();

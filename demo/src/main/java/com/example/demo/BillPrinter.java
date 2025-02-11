@@ -122,7 +122,7 @@ public class BillPrinter {
         previewStage.show();
 
         // Uncomment the next line to print without preview
-        // printNode(layout,counterArticls);
+        //printNode(layout,counterArticls);
     }
 
     private HBox createLabelRow(String text, double value) {
