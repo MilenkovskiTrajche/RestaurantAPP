@@ -72,7 +72,14 @@ public class Admin extends Application {
 
         passwordField.setOnKeyPressed(event -> {
             if(event.getCode() == KeyCode.ENTER) {
-                if(checkAdmin(passwordField.getText())) {
+                int pasword = 0;
+                try {
+                     pasword= Integer.parseInt(passwordField.getText());
+                }catch (NumberFormatException e) {
+                    showAlertError("Внеси шифра!");
+                    passwordField.clear();
+                }
+                if(checkAdmin(String.valueOf(pasword))) {
                     addEditEmployeeButton.setDisable(false);
                     addEditArticleButton.setDisable(false);
                     viewBy.setDisable(false);
@@ -93,7 +100,10 @@ public class Admin extends Application {
         );
         addEditEmployeeButton.setOnAction(_ -> addEditEmployeeButton());
         addEditArticleButton.setOnAction(_ -> addEditArticleButton());
-        //viewBy.setOnAction(_ -> );
+        viewBy.setOnAction(_ ->{
+            RestaurantApp restaurantApp = new RestaurantApp();
+            restaurantApp.showAdminPanel();
+        });
         exitButton.setOnAction(_ -> primaryStage.close());
 
         Platform.runLater(passwordField::requestFocus);
@@ -432,7 +442,7 @@ public class Admin extends Application {
         // Table for displaying articles
         Stage primaryStage = new Stage();
         articleTable = new TableView<>();
-        TableColumn<String[], String> idColumn = new TableColumn<>("Назив");
+        TableColumn<String[], String> idColumn = new TableColumn<>("ID");
         idColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
         TableColumn<String[], String> nazivColumn = new TableColumn<>("Назив");
         nazivColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[1]));

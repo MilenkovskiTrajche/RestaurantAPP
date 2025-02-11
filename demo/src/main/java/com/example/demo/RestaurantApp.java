@@ -1,6 +1,7 @@
 package com.example.demo;
 
 
+import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -20,6 +21,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
@@ -27,7 +29,9 @@ import javafx.scene.input.KeyCode;
 import javafx.stage.StageStyle;
 import javafx.beans.binding.Bindings;
 
+import java.awt.*;
 import java.sql.*;
+import java.sql.Date;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -105,7 +109,7 @@ public class RestaurantApp extends Application {
         // Vertical Line Separator
         Region separator = new Region();
         separator.setPrefWidth(screenWidth * 0.005);
-        separator.setStyle("-fx-background-color: black;");
+        separator.setBackground(new Background(new BackgroundFill(Color.BLACK, CornerRadii.EMPTY, Insets.EMPTY)));
 
         // Handle Enter key for tableField
         tableField.setOnAction(_ -> {
@@ -253,7 +257,7 @@ public class RestaurantApp extends Application {
 
         // Dynamic font size for labels
         imevraboten.styleProperty().bind(Bindings.concat("-fx-font-size: ", screenWidth / 50, "px;"));
-        totalPriceLabel.styleProperty().bind(Bindings.concat("-fx-border-color: gray;-fx-font-weight: bold;-fx-font-size: ", screenWidth / 50, "px;"));
+        totalPriceLabel.styleProperty().bind(Bindings.concat("-fx-padding: 0 5 0 10;-fx-border-color: gray;-fx-font-weight: bold;-fx-font-size: ", screenWidth / 50, "px;"));
         bottombox.setPadding(new Insets(0,20,0,15));
         bottombox.getChildren().addAll(imevraboten,totalPriceLabel);
         // Create middle section layout with input fields and buttons
@@ -372,8 +376,9 @@ public class RestaurantApp extends Application {
         //buttons
         Button addArticleButton = new Button("Додади");
         Button escButton = new Button("ESC");
-        Button smetkaButton = new Button("F1|Фискална Сметка");
+        Button smetkaButton = new Button("F1|Фискална");
         Button fakturasmetkaButton = new Button("F2|Фактура");
+        Button karticasmetkaButton = new Button("F3|Картичка");
         Button deleteButton = new Button("Delete|Избриши");
         Button transferButton = new Button("F5|Префрли маса");
         Button transferArticleButton = new Button("F4|Префрли артикл");
@@ -382,7 +387,7 @@ public class RestaurantApp extends Application {
         // Define button list for easy iteration
         List<Button> buttons = Arrays.asList(
                 smetkaButton, fakturasmetkaButton, deleteButton,
-                addArticleButton, escButton, transferButton, transferArticleButton,prefrlikelner
+                addArticleButton, escButton, transferButton, transferArticleButton,prefrlikelner,karticasmetkaButton
         );
 
         // Apply styles dynamically
@@ -474,8 +479,10 @@ public class RestaurantApp extends Application {
 
         addArticleButton.setOnAction(_ -> {
             Platform.runLater(articleInputField::requestFocus);
+            if(quantityInputField.getText().isEmpty()){
+                quantityInputField.setText("1");
+            }
             onAddArticle(tn, employeeId);});
-        //addArticleButton.setStyle("-fx-font-size: 15;-fx-alignment: center;");
 
         escButton.setOnAction(_ -> {
             tableGrid.getChildren().clear();
@@ -507,7 +514,6 @@ public class RestaurantApp extends Application {
             }
             articleStage.close()
             ;});
-        //escButton.setAlignment(Pos.BOTTOM_CENTER);
 
         // Smetka Button
         smetkaButton.setOnAction(_ -> {
@@ -526,7 +532,24 @@ public class RestaurantApp extends Application {
             smetkaData.clear();
             AllData.clear();
             escButton.fire();
-            //articleStage.close();
+        });
+        // Smetka Button
+        karticasmetkaButton.setOnAction(_ -> {
+            if (AllData.isEmpty()) {
+                // Show an alert if there is no order
+                Alert alert = new Alert(Alert.AlertType.WARNING);
+                alert.setTitle("Нема нарачки");
+                alert.setHeaderText(null);
+                alert.setContentText("Нема нарачки за да се креира сметка.");
+                alert.showAndWait();
+                return;
+            }
+            createBill(employeeId,tn,"картичка");
+            String btnname = ime + ":" + tn;
+            deleteTableButtonFromGrid(btnname);
+            smetkaData.clear();
+            AllData.clear();
+            escButton.fire();
         });
 
         tableView.setOnMouseClicked(event -> {
@@ -556,7 +579,6 @@ public class RestaurantApp extends Application {
             smetkaData.clear();
             AllData.clear();
             escButton.fire();
-            //articleStage.close();
         });
 
         deleteButton.setOnAction(_ -> {
@@ -820,6 +842,7 @@ public class RestaurantApp extends Application {
                 String[] selectedItem = orderTable.getSelectionModel().getSelectedItem();
                 if (selectedItem != null) {deleteButton.fire();}
             }
+            if(event.getCode() == KeyCode.F3) {karticasmetkaButton.fire();}
             if(event.getCode() == KeyCode.F4) {transferArticleButton.fire();}
             if(event.getCode() == KeyCode.F5) {transferButton.fire();}
             if(event.getCode() == KeyCode.F10) {prefrlikelner.fire();}
@@ -847,10 +870,11 @@ public class RestaurantApp extends Application {
         // Bottom button layout using HBox
         HBox bottomButtonsBox = new HBox(20);  // 20px spacing between buttons
         bottomButtonsBox.setAlignment(Pos.BASELINE_LEFT);  // Align buttons at the center
-        smetkaButton.prefWidthProperty().bind(bottomButtonsBox.widthProperty().divide(2));
-        fakturasmetkaButton.prefWidthProperty().bind(bottomButtonsBox.widthProperty().divide(2));
+        smetkaButton.prefWidthProperty().bind(bottomButtonsBox.widthProperty().divide(3));
+        fakturasmetkaButton.prefWidthProperty().bind(bottomButtonsBox.widthProperty().divide(3));
+        karticasmetkaButton.prefWidthProperty().bind(bottomButtonsBox.widthProperty().divide(3));
         // Add buttons to the bottom section
-        bottomButtonsBox.getChildren().addAll(smetkaButton,fakturasmetkaButton);
+        bottomButtonsBox.getChildren().addAll(smetkaButton,fakturasmetkaButton,karticasmetkaButton);
 
         VBox separator = new VBox(20);
         separator.setAlignment(Pos.BASELINE_LEFT);
@@ -1035,10 +1059,9 @@ public class RestaurantApp extends Application {
                         });
                     }
                 }
-                //showBillPopup(smetkaData,totalPrice, titleSmetka,tn);
             }
             BillPrinter billPrinter = new BillPrinter();
-            billPrinter.printBill(imevraboten, smetkaData, ddv18, ddv15, ddv5,ddvValue , totalPrice);
+            billPrinter.printBill(imevraboten, smetkaData, ddv18, ddv15, ddv5 , totalPrice);
 
             conn.commit();
 
@@ -1135,7 +1158,7 @@ public class RestaurantApp extends Application {
                 }
             }
             BillPrinter billPrinter = new BillPrinter();
-            billPrinter.printBill(imevraboten, smetkaData, ddv18, ddv15, ddv5,ddvValue , totalPrice);
+            billPrinter.printBill(imevraboten, smetkaData, ddv18, ddv15, ddv5 , totalPrice);
 
             conn.commit();
 
@@ -1832,7 +1855,7 @@ public class RestaurantApp extends Application {
             }
         });
     }
-    private static void ReadArticles() {
+    static void ReadArticles() {
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement("SELECT id, naziv, cena FROM artikl\n" +
                      "order by id;");
@@ -2034,7 +2057,7 @@ public class RestaurantApp extends Application {
         tipsmetka.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
 
         ComboBox<String> tipSmetkaComboBox = new ComboBox<>();
-        tipSmetkaComboBox.getItems().addAll("Сите", "фискална", "фактура");
+        tipSmetkaComboBox.getItems().addAll("Сите", "фискална", "фактура","картичка");
         tipSmetkaComboBox.setValue("Сите");
         tipSmetkaComboBox.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.18));
         tipSmetkaComboBox.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
@@ -2074,7 +2097,7 @@ public class RestaurantApp extends Application {
                 totalPriceLabel.setText("Вкупно: " + selectedItem[3]);
                 totalPriceLabel.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.25));
                 totalPriceLabel.styleProperty().bind(Bindings.concat("-fx-border-color: gray;-fx-font-weight: bold;-fx-font-size: ", rightAdminResultTable.widthProperty().divide(30), "px;"));
-                if (selectedItem[6].equals("фискална")) {
+                if (selectedItem[6].equals("фискална") || selectedItem[6].equals("картичка")) {
                     adminfakturabtn.setDisable(false);
                 }
                 if (selectedItem[6].equals("фактура")) {
@@ -2262,9 +2285,9 @@ public class RestaurantApp extends Application {
             PreparedStatement ps = conn.prepareStatement(query);
 
             // Set the common parameters
-            ps.setDate(1, java.sql.Date.valueOf(dateFrom)); // Date from
+            ps.setDate(1, Date.valueOf(dateFrom)); // Date from
             ps.setTime(2, Time.valueOf(vremeod)); // Time from
-            ps.setDate(3, java.sql.Date.valueOf(dateTo)); // Date to
+            ps.setDate(3, Date.valueOf(dateTo)); // Date to
             ps.setTime(4, Time.valueOf(vremedo)); // Time to
 
             // Set conditional parameters
@@ -2351,9 +2374,9 @@ public class RestaurantApp extends Application {
             PreparedStatement ps = conn.prepareStatement(query);
 
             // Set the common parameters
-            ps.setDate(1, java.sql.Date.valueOf(dateFrom)); // Date from
+            ps.setDate(1, Date.valueOf(dateFrom)); // Date from
             ps.setTime(2, Time.valueOf(vremeod)); // Time from
-            ps.setDate(3, java.sql.Date.valueOf(dateTo)); // Date to
+            ps.setDate(3, Date.valueOf(dateTo)); // Date to
             ps.setTime(4, Time.valueOf(vremedo)); // Time to
 
             // Set conditional parameters
@@ -2397,105 +2420,132 @@ public class RestaurantApp extends Application {
 
 
     private void setupRightSmetkaTable() {
-        rightAdminResultTable.getColumns().clear();
-        // Create columns
-        TableColumn<String[], String> artiklColumn = new TableColumn<>("Артикл");
-        artiklColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.30)); // 30%
+        try {
+            rightAdminResultTable.getColumns().clear();
+            rightAdminResultTable.getItems().clear();
+            // Create columns
+            TableColumn<String[], String> artiklColumn = new TableColumn<>("Артикл");
+            artiklColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.30)); // 30%
 
-        TableColumn<String[], String> kolicinaColumn = new TableColumn<>("Количина");
-        kolicinaColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.10)); // 10%
+            TableColumn<String[], String> kolicinaColumn = new TableColumn<>("Количина");
+            kolicinaColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.10)); // 10%
 
-        TableColumn<String[], String> cenaColumn = new TableColumn<>("Цена");
-        cenaColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.10)); // 15%
+            TableColumn<String[], String> cenaColumn = new TableColumn<>("Цена");
+            cenaColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.10)); // 15%
 
-        TableColumn<String[], String> vkupnoColumn = new TableColumn<>("Вкупно");
-        vkupnoColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.15)); // 15%
+            TableColumn<String[], String> vkupnoColumn = new TableColumn<>("Вкупно");
+            vkupnoColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.15)); // 15%
 
-        TableColumn<String[], String> datumColumn = new TableColumn<>("Дата");
-        datumColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.18)); // 15%
+            TableColumn<String[], String> datumColumn = new TableColumn<>("Дата");
+            datumColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.18)); // 15%
 
-        TableColumn<String[], String> vremecolumm = new TableColumn<>("Време");
-        vremecolumm.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.14)); // 15%
+            TableColumn<String[], String> vremecolumm = new TableColumn<>("Време");
+            vremecolumm.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.14)); // 15%
 
-        // Set cell value factories
-        artiklColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
-        kolicinaColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[1]));
-        cenaColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[2]));
-        vkupnoColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[3]));
-        datumColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[4]));
-        vremecolumm.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[5]));
+            // Set cell value factories
+            artiklColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
+            kolicinaColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[1]));
+            cenaColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[2]));
+            vkupnoColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[3]));
+            datumColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[4]));
+            vremecolumm.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[5]));
 
-        // Bind font size dynamically based on table width
-        rightAdminResultTable.styleProperty().bind(Bindings.concat("-fx-font-size: ",
-                rightAdminResultTable.widthProperty().divide(35).asString(), "px;"));
+            // Bind font size dynamically based on table width
+            rightAdminResultTable.styleProperty().bind(Bindings.concat("-fx-font-size: ",
+                    rightAdminResultTable.widthProperty().divide(35).asString(), "px;"));
 
-        // Add columns to the TableView
-        rightAdminResultTable.getColumns().addAll(artiklColumn, kolicinaColumn, cenaColumn, vkupnoColumn, datumColumn, vremecolumm);
+            // Add columns to the TableView
+            rightAdminResultTable.getColumns().addAll(artiklColumn, kolicinaColumn, cenaColumn, vkupnoColumn, datumColumn, vremecolumm);
+        }catch (IndexOutOfBoundsException e){
+            showAlert("Грешка додека се креира табелата. Обиди се повторно!");
+            rightAdminResultTable.getColumns().clear();
+            rightAdminResultTable.getItems().clear();
+        }
     }
 
 
     private void setupRightArtikliTable() {
-        rightAdminResultTable.getColumns().clear();
+        try {
+            rightAdminResultTable.getColumns().clear();
+            rightAdminResultTable.getItems().clear();
+            // Create columns
+            TableColumn<String[], String> artiklColumn = new TableColumn<>("Артикл");
+            artiklColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.25)); // 30%
+            TableColumn<String[], String> kolicinaColumn = new TableColumn<>("Количина");
+            kolicinaColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.25)); // 30%
+            // Set cell value factories
+            artiklColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
+            kolicinaColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[1]));
 
-        // Create columns
-        TableColumn<String[], String> artiklColumn = new TableColumn<>("Артикл");
-        artiklColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.25)); // 30%
-        TableColumn<String[], String> kolicinaColumn = new TableColumn<>("Количина");
-        kolicinaColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.25)); // 30%
-        // Set cell value factories
-        artiklColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
-        kolicinaColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[1]));
+            // Bind font size dynamically based on table width
+            rightAdminResultTable.styleProperty().bind(Bindings.concat("-fx-font-size: ",
+                    rightAdminResultTable.widthProperty().divide(35).asString(), "px;"));
 
-        // Bind font size dynamically based on table width
-        rightAdminResultTable.styleProperty().bind(Bindings.concat("-fx-font-size: ",
-                rightAdminResultTable.widthProperty().divide(35).asString(), "px;"));
-
-        // Add columns to the TableView
-        rightAdminResultTable.getColumns().addAll(artiklColumn, kolicinaColumn);
+            // Add columns to the TableView
+            rightAdminResultTable.getColumns().addAll(artiklColumn, kolicinaColumn);
+        }catch (IndexOutOfBoundsException e){
+            showAlert("Грешка додека се креира табелата. Обиди се повторно!");
+            rightAdminResultTable.getColumns().clear();
+            rightAdminResultTable.getItems().clear();
+        }
     }
     private void setupRightDeleteArtikliTable() {
-        rightAdminResultTable.getColumns().clear();
+        try {
+            rightAdminResultTable.getColumns().clear();
+            rightAdminResultTable.getItems().clear();
 
-        // Create columns
-        TableColumn<String[], String> artiklColumn = new TableColumn<>("Артикл");
-        artiklColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.40)); // 30%
-        TableColumn<String[], String> kolicinaColumn = new TableColumn<>("Количина");
-        kolicinaColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.20)); // 30%
-        TableColumn<String[], String> vremeColumn = new TableColumn<>("Време");
-        vremeColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.20)); // 30%
-        TableColumn<String[], String> masaColumn = new TableColumn<>("Маса");
-        masaColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.15)); // 30%
+            // Create columns
+            TableColumn<String[], String> artiklColumn = new TableColumn<>("Артикл");
+            artiklColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.40)); // 30%
+            TableColumn<String[], String> kolicinaColumn = new TableColumn<>("Количина");
+            kolicinaColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.20)); // 30%
+            TableColumn<String[], String> vremeColumn = new TableColumn<>("Време");
+            vremeColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.20)); // 30%
+            TableColumn<String[], String> masaColumn = new TableColumn<>("Маса");
+            masaColumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.15)); // 30%
 
-        // Set cell value factories
-        artiklColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
-        kolicinaColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[1]));
-        vremeColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[2]));
-        masaColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[3]));
+            // Set cell value factories
+            artiklColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
+            kolicinaColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[1]));
+            vremeColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[2]));
+            masaColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[3]));
 
-        // Bind font size dynamically based on table width
-        rightAdminResultTable.styleProperty().bind(Bindings.concat("-fx-font-size: ",
-                rightAdminResultTable.widthProperty().divide(35).asString(), "px;"));
-        // Add columns to the TableView
-        rightAdminResultTable.getColumns().addAll(artiklColumn, kolicinaColumn,vremeColumn,masaColumn);
+            // Bind font size dynamically based on table width
+            rightAdminResultTable.styleProperty().bind(Bindings.concat("-fx-font-size: ",
+                    rightAdminResultTable.widthProperty().divide(35).asString(), "px;"));
+            // Add columns to the TableView
+            rightAdminResultTable.getColumns().addAll(artiklColumn, kolicinaColumn, vremeColumn, masaColumn);
+        }catch (IndexOutOfBoundsException e){
+            showAlert("Грешка додека се креира табелата. Обиди се повторно!");
+            rightAdminResultTable.getColumns().clear();
+            rightAdminResultTable.getItems().clear();
+        }
     }
     private void setupRightDDVTable() {
-        rightAdminResultTable.getColumns().clear();
+        try {
+            rightAdminResultTable.getColumns().clear();
+            rightAdminResultTable.getItems().clear();
 
-        // Create columns
-        TableColumn<String[], String> ddvcolumn = new TableColumn<>("ДДВ %");
-        ddvcolumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.25)); // 30%
-        TableColumn<String[], String> sumaddvcolumn = new TableColumn<>("Сума");
-        sumaddvcolumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.25)); // 30%
+            // Create columns
+            TableColumn<String[], String> ddvcolumn = new TableColumn<>("ДДВ %");
+            ddvcolumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.25)); // 30%
+            TableColumn<String[], String> sumaddvcolumn = new TableColumn<>("Сума");
+            sumaddvcolumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.25)); // 30%
 
-        // Set cell value factories
-        ddvcolumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
-        sumaddvcolumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[1]));
+            // Set cell value factories
+            ddvcolumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
+            sumaddvcolumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[1]));
 
-        // Bind font size dynamically based on table width
-        rightAdminResultTable.styleProperty().bind(Bindings.concat("-fx-font-size: ",
-                rightAdminResultTable.widthProperty().divide(35).asString(), "px;"));
-        // Add columns to the TableView
-        rightAdminResultTable.getColumns().addAll(ddvcolumn, sumaddvcolumn);
+            // Bind font size dynamically based on table width
+            rightAdminResultTable.styleProperty().bind(Bindings.concat("-fx-font-size: ",
+                    rightAdminResultTable.widthProperty().divide(35).asString(), "px;"));
+            // Add columns to the TableView
+            rightAdminResultTable.getColumns().addAll(ddvcolumn, sumaddvcolumn);
+        }catch (IndexOutOfBoundsException e){
+            showAlert("Грешка додека се креира табелата. Обиди се повторно!");
+            rightAdminResultTable.getColumns().clear();
+            rightAdminResultTable.getItems().clear();
+        }
     }
 
     private void executeArtikliQuery(LocalDate dateFrom, LocalDate dateTo, String vremeod, String vremedo,String vrabotenshifra,String tipSmetka) {
@@ -2541,9 +2591,9 @@ public class RestaurantApp extends Application {
             PreparedStatement ps = conn.prepareStatement(query);
 
             // Set the common parameters
-            ps.setDate(1, java.sql.Date.valueOf(dateFrom)); // Date from
+            ps.setDate(1, Date.valueOf(dateFrom)); // Date from
             ps.setTime(2, Time.valueOf(vremeod)); // Time from
-            ps.setDate(3, java.sql.Date.valueOf(dateTo)); // Date to
+            ps.setDate(3, Date.valueOf(dateTo)); // Date to
             ps.setTime(4, Time.valueOf(vremedo)); // Time to
 
             // Set conditional parameters
@@ -2620,9 +2670,9 @@ public class RestaurantApp extends Application {
             PreparedStatement ps = conn.prepareStatement(query);
 
             // Set the common parameters
-            ps.setDate(1, java.sql.Date.valueOf(dateFrom)); // Date from
+            ps.setDate(1, Date.valueOf(dateFrom)); // Date from
             ps.setTime(2, Time.valueOf(vremeod)); // Time from
-            ps.setDate(3, java.sql.Date.valueOf(dateTo)); // Date to
+            ps.setDate(3, Date.valueOf(dateTo)); // Date to
             ps.setTime(4, Time.valueOf(vremedo)); // Time to
 
             // Set conditional parameters
@@ -2748,14 +2798,15 @@ public class RestaurantApp extends Application {
 
         double fiscalTotal = 0;
         double invoiceTotal = 0;
+        double karticaTotal = 0;
         List<String[]> deletedItems = new ArrayList<>();
 
         try (Connection conn = DatabaseConnection.getConnection()) {
             // Query for fiscal
             try (PreparedStatement ps = conn.prepareStatement(query)) {
-                ps.setDate(1, java.sql.Date.valueOf(dateFrom)); // Date from
+                ps.setDate(1, Date.valueOf(dateFrom)); // Date from
                 ps.setTime(2, Time.valueOf(timeFrom)); // Time from
-                ps.setDate(3, java.sql.Date.valueOf(dateTo)); // Date to
+                ps.setDate(3, Date.valueOf(dateTo)); // Date to
                 ps.setTime(4, Time.valueOf(timeTo)); // Time to
                 ps.setString(5, "фискална");
                 if (filterByShifrav) {
@@ -2769,9 +2820,9 @@ public class RestaurantApp extends Application {
             }
             // Query for invoice
             try (PreparedStatement ps = conn.prepareStatement(query)) {
-                ps.setDate(1, java.sql.Date.valueOf(dateFrom)); // Date from
+                ps.setDate(1, Date.valueOf(dateFrom)); // Date from
                 ps.setTime(2, Time.valueOf(timeFrom)); // Time from
-                ps.setDate(3, java.sql.Date.valueOf(dateTo)); // Date to
+                ps.setDate(3, Date.valueOf(dateTo)); // Date to
                 ps.setTime(4, Time.valueOf(timeTo)); // Time to
                 ps.setString(5, "фактура");
                 if (filterByShifrav) {
@@ -2783,10 +2834,25 @@ public class RestaurantApp extends Application {
                     invoiceTotal = rs.getDouble("Suma");
                 }
             }
-            try (PreparedStatement ps = conn.prepareStatement(deletedItemsQuery)) {
-                ps.setDate(1, java.sql.Date.valueOf(dateFrom)); // Date from
+            try (PreparedStatement ps = conn.prepareStatement(query)) {
+                ps.setDate(1, Date.valueOf(dateFrom)); // Date from
                 ps.setTime(2, Time.valueOf(timeFrom)); // Time from
-                ps.setDate(3, java.sql.Date.valueOf(dateTo)); // Date to
+                ps.setDate(3, Date.valueOf(dateTo)); // Date to
+                ps.setTime(4, Time.valueOf(timeTo)); // Time to
+                ps.setString(5, "картичка");
+                if (filterByShifrav) {
+                    ps.setInt(6, Integer.parseInt(employeeCode));
+                }
+
+                ResultSet rs = ps.executeQuery();
+                if (rs.next()) {
+                    karticaTotal = rs.getDouble("Suma");
+                }
+            }
+            try (PreparedStatement ps = conn.prepareStatement(deletedItemsQuery)) {
+                ps.setDate(1, Date.valueOf(dateFrom)); // Date from
+                ps.setTime(2, Time.valueOf(timeFrom)); // Time from
+                ps.setDate(3, Date.valueOf(dateTo)); // Date to
                 ps.setTime(4, Time.valueOf(timeTo));
                 if (filterByShifrav) {
                     ps.setInt(5, Integer.parseInt(employeeCode));
@@ -2804,7 +2870,7 @@ public class RestaurantApp extends Application {
         } catch (Exception e) {
             showAlert(e.getMessage());
         }
-        double total = fiscalTotal + invoiceTotal;
+        double total = fiscalTotal + invoiceTotal + karticaTotal;
 
         // Create the popup stage
         Stage stage = new Stage();
@@ -2825,6 +2891,7 @@ public class RestaurantApp extends Application {
                 new String[]{"Време од:", timeFrom + "            до:   " + timeTo});
         GridPane printfiscalPane = createSection("Фискален промет:   " + String.format("%.2f",fiscalTotal));
         GridPane printinvoicePane = createSection("Фактура промет:     " + String.format("%.2f", invoiceTotal));
+        GridPane printikarticaPane = createSection("Картичка промет:     " + String.format("%.2f", karticaTotal));
         GridPane printtotalPane = createSection("Вкупен промет:       " + String.format("%.2f", total));
         // Add a title
         Label titleLabel = new Label("Преглед по вработен - " + employeeName);
@@ -2838,6 +2905,7 @@ public class RestaurantApp extends Application {
                 new String[]{"Време од:", timeFrom + "            до:   " + timeTo});
         GridPane fiscalPane = createSection("Фискален промет:   " + String.format("%.2f",fiscalTotal));
         GridPane invoicePane = createSection("Фактура промет:     " + String.format("%.2f", invoiceTotal));
+        GridPane karticaPane = createSection("Картица промет:     " + String.format("%.2f", karticaTotal));
         GridPane totalPane = createSection("Вкупен промет:       " + String.format("%.2f", total));
 
         // Create table for deleted items
@@ -2889,18 +2957,18 @@ public class RestaurantApp extends Application {
         layout.setSpacing(5); // Add spacing between sections
         layout.setStyle("-fx-font-size: 16;");
         layout.setPadding(new Insets(10));
-        layout.getChildren().addAll(titleLabel, detailsPane, fiscalPane, invoicePane, totalPane, deletedItemsSection,printButton);
+        layout.getChildren().addAll(titleLabel, detailsPane, fiscalPane, invoicePane,karticaPane, totalPane, deletedItemsSection,printButton);
 
         VBox printlayout = new VBox();
         printlayout.setSpacing(5); // Add spacing between sections
         printlayout.setStyle("-fx-font-size: 16;");
         printlayout.setPadding(new Insets(10));
-        printlayout.getChildren().addAll(printtitleLabel, printdetailsPane, printfiscalPane, printinvoicePane, printtotalPane);
+        printlayout.getChildren().addAll(printtitleLabel, printdetailsPane, printfiscalPane, printinvoicePane,printikarticaPane, printtotalPane);
         printlayout.setAlignment(Pos.CENTER);
 
         printButton.setOnAction(_ ->{
             PrinterService printerService = new PrinterService();
-            printerService.printNode(printlayout,1);
+            printerService.printNode(printlayout,400);
         });
 
         // Wrap the layout in a ScrollPane

@@ -1,10 +1,12 @@
 package com.example.demo;
 
 import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
 import javafx.print.*;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.*;
 import javafx.scene.shape.Line;
 import javafx.scene.text.Font;
@@ -16,10 +18,10 @@ import java.time.format.DateTimeFormatter;
 
 public class BillPrinter {
 
-    public void printBill(String employeeName, ObservableList<String[]> orderData, double ddv18, double ddv15, double ddv5, double totalDdv, double totalPrice) {
-        int counterArticls=0;
+    public void printBill(String employeeName, ObservableList<String[]> orderData, double ddv18, double ddv15, double ddv5, double totalPrice) {
+        int counterArticls=1;
         VBox layout = new VBox(10);
-        layout.setStyle("-fx-padding: 10; -fx-alignment: top-center;");
+        layout.setStyle("-fx-padding: 20; -fx-alignment: top-center;");
         double sumddv = 0.0;
         sumddv=ddv18+ddv15+ddv5;
         // Title: "СМЕТКА"
@@ -28,7 +30,7 @@ public class BillPrinter {
         layout.getChildren().add(titleLabel);
 
         // Separator Line
-        layout.getChildren().add(new Line(0, 0, 280, 0));
+        layout.getChildren().add(new Line(0, 0, 350, 0));
 
         // Articles Header
         HBox headerRow = new HBox();
@@ -49,7 +51,7 @@ public class BillPrinter {
         layout.getChildren().add(headerRow);
 
         // Separator Line
-        layout.getChildren().add(new Line(0, 0, 280, 0));
+        layout.getChildren().add(new Line(0, 0, 350, 0));
 
         // Articles Data
         for (String[] articleData : orderData) {
@@ -76,7 +78,7 @@ public class BillPrinter {
         }
 
         // Separator Line
-        layout.getChildren().add(new Line(0, 0, 280, 0));
+        layout.getChildren().add(new Line(0, 0, 350, 0));
 
         // Tax Breakdown
         layout.getChildren().add(createLabelRow("ДДВ 18 %:", ddv18));
@@ -89,7 +91,7 @@ public class BillPrinter {
         layout.getChildren().add(createLabelRowWithCustomLabel(totalDdvLabel, sumddv));
 
         // Separator Line
-        layout.getChildren().add(new Line(0, 0, 280, 0));
+        layout.getChildren().add(new Line(0, 0, 350, 0));
 
         // Make the "Вкупен промет" label bold
         Label totalPriceLabel = new Label("Вкупен промет:");
@@ -97,7 +99,7 @@ public class BillPrinter {
         layout.getChildren().add(createLabelRowWithCustomLabel(totalPriceLabel, totalPrice));
 
         // Separator Line
-        layout.getChildren().add(new Line(0, 0, 280, 0));
+        layout.getChildren().add(new Line(0, 0, 350, 0));
 
         // Employee and Date Info
         Label employeeLabel = new Label("Вработен: " + employeeName);
@@ -106,23 +108,20 @@ public class BillPrinter {
         Label thankYouLabel = new Label("ПОВЕЛЕТЕ ПОВТОРНО!");
 
         layout.getChildren().addAll(employeeLabel, dateTimeLabel, thankYouLabel);
-
+        layout.setPadding(new Insets(50,20,0,20));
 
 
         // **PREVIEW FIRST, THEN PRINT**
-        int previewWidth = 300;  // Default width
-        int previewHeight = 400 + (counterArticls * 20);  // Add extra height based on number of articles
-
-        // Set minimum height if necessary to avoid very small preview
-        previewHeight = Math.max(previewHeight, 400);  // Ensure minimum height
-
-        Stage previewStage = new Stage();
-        previewStage.setScene(new Scene(layout, previewWidth, previewHeight));
-        previewStage.setTitle("Преглед на печатење");
-        previewStage.show();
+        int previewWidth = 378;  // Default width
+        int previewHeight = 350 + (counterArticls * 25);  // Add extra height based on number of articles
+//
+//        Stage previewStage = new Stage();
+//        previewStage.setScene(new Scene(layout, previewWidth, previewHeight));
+//        previewStage.setTitle("Преглед на печатење");
+//        previewStage.show();
 
         // Uncomment the next line to print without preview
-        //printNode(layout,counterArticls);
+        printNode(layout,previewHeight);
     }
 
     private HBox createLabelRow(String text, double value) {
@@ -147,40 +146,36 @@ public class BillPrinter {
         return row;
     }
 
-    private void printNode(Node node, int numberOfArticles) {
-        Printer printer = Printer.getDefaultPrinter();
+    public void printNode(Node node,int previewHeight) {
         PrinterJob job = PrinterJob.createPrinterJob();
 
-        if (job != null && job.showPrintDialog(null)) {
-            // Get the printable area
-            PageLayout pageLayout = printer.createPageLayout(Paper.A4, PageOrientation.PORTRAIT, 10, 10, 10, 10);
-            double printableWidth = pageLayout.getPrintableWidth();
-            double printableHeight = pageLayout.getPrintableHeight();
+        if (job != null) {
+            // Set fixed width for the printer (10 cm ≈ 378 pixels)
+            int fixedWidth = 378;
 
-            // Calculate estimated height of the bill
-            double baseHeight = 150; // Fixed height for headers, tax breakdown, total, employee info
-            double articleRowHeight = 20; // Estimated height per article row
-            double estimatedHeight = baseHeight + (numberOfArticles * articleRowHeight);
-
-            // Scale if bill is too tall
-            double scale = 1.0;
-            if (estimatedHeight > printableHeight) {
-                scale = printableHeight / estimatedHeight;
+            if (node instanceof Region) {
+                ((Region) node).setPrefWidth(fixedWidth);
+                ((Region) node).setMinWidth(fixedWidth);
+                ((Region) node).setMaxWidth(fixedWidth);
+                ((Region) node).setMinHeight(previewHeight);
+                ((Region) node).setMaxHeight(previewHeight);
+                ((Region) node).setPrefHeight(previewHeight);
             }
 
-            // Apply scaling only if needed
-            if (scale < 1.0) {
-                node.setScaleX(scale);
-                node.setScaleY(scale);
-            }
+            // Create a preview stage without ScrollPane
+            Stage previewStage = new Stage();
+            Scene previewScene = new Scene(new ScrollPane(node)); // Wrap in a ScrollPane if long
+            previewStage.setScene(previewScene);
+            previewStage.setTitle("Преглед на печатењеPRINTNODE");
+            previewStage.show();
 
-
-            // Print the scaled bill
-            boolean success = job.printPage(node);
-            if (success) {
-                job.endJob();
-            }
+//            // Print the scaled bill
+//            boolean success = job.printPage(node);
+//            if (success) {
+//                job.endJob();
+//            }
         }
+
     }
 
 }
