@@ -257,7 +257,7 @@ public class RestaurantApp extends Application {
 
         // Dynamic font size for labels
         imevraboten.styleProperty().bind(Bindings.concat("-fx-font-size: ", screenWidth / 50, "px;"));
-        totalPriceLabel.styleProperty().bind(Bindings.concat("-fx-padding: 0 5 0 10;-fx-border-color: gray;-fx-font-weight: bold;-fx-font-size: ", screenWidth / 50, "px;"));
+        totalPriceLabel.styleProperty().bind(Bindings.concat("-fx-padding: 0 0 0 10;-fx-border-color: gray;-fx-font-weight: bold;-fx-font-size: ", screenWidth / 50, "px;"));
         bottombox.setPadding(new Insets(0,20,0,15));
         bottombox.getChildren().addAll(imevraboten,totalPriceLabel);
         // Create middle section layout with input fields and buttons
@@ -1002,7 +1002,7 @@ public class RestaurantApp extends Application {
             // Commit the transaction
             //conn.commit();
             double ddv18 = 0.0;
-            double ddv15 = 0.0;
+            double ddv10 = 0.0;
             double ddv5 = 0.0;
             double ddvValue = 0.0;
 
@@ -1024,7 +1024,7 @@ public class RestaurantApp extends Application {
 
                         switch (ddvType) {
                             case 18 -> ddv18 = ddvValue;
-                            case 15 -> ddv15 = ddvValue;
+                            case 10 -> ddv10 = ddvValue;
                             case 5 -> ddv5 = ddvValue;
                         }
                     }
@@ -1061,7 +1061,7 @@ public class RestaurantApp extends Application {
                 }
             }
             BillPrinter billPrinter = new BillPrinter();
-            billPrinter.printBill(imevraboten, smetkaData, ddv18, ddv15, ddv5 , totalPrice);
+            billPrinter.printBill(imevraboten, smetkaData, ddv18, ddv10, ddv5 , totalPrice);
 
             conn.commit();
 
@@ -1086,7 +1086,7 @@ public class RestaurantApp extends Application {
             conn.setAutoCommit(false); // Start transaction
 
             double ddv18 = 0.0;
-            double ddv15 = 0.0;
+            double ddv10 = 0.0;
             double ddv5 = 0.0;
             double ddvValue = 0.0;
 
@@ -1108,7 +1108,7 @@ public class RestaurantApp extends Application {
 
                         switch (ddvType) {
                             case 18 -> ddv18 = ddvValue;
-                            case 15 -> ddv15 = ddvValue;
+                            case 10 -> ddv10 = ddvValue;
                             case 5 -> ddv5 = ddvValue;
                         }
                     }
@@ -1158,7 +1158,7 @@ public class RestaurantApp extends Application {
                 }
             }
             BillPrinter billPrinter = new BillPrinter();
-            billPrinter.printBill(imevraboten, smetkaData, ddv18, ddv15, ddv5 , totalPrice);
+            billPrinter.printBill(imevraboten, smetkaData, ddv18, ddv10, ddv5 , totalPrice);
 
             conn.commit();
 
@@ -2883,16 +2883,6 @@ public class RestaurantApp extends Application {
         gridPane.setVgap(10);
         gridPane.setStyle("-fx-border-color: black; -fx-border-width: 2; -fx-padding: 10;");
 
-        //printlayoutCLONE
-        Label printtitleLabel = new Label("Преглед по вработен - " + employeeName);
-        // Add sections with borders for the table
-        GridPane printdetailsPane = createSection("Детали за временски период",
-                new String[]{"Датум од:", dateFrom.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")) + "       до:   " + dateTo.format(DateTimeFormatter.ofPattern("dd-MM-yyyy"))},
-                new String[]{"Време од:", timeFrom + "            до:   " + timeTo});
-        GridPane printfiscalPane = createSection("Фискален промет:   " + String.format("%.2f",fiscalTotal));
-        GridPane printinvoicePane = createSection("Фактура промет:     " + String.format("%.2f", invoiceTotal));
-        GridPane printikarticaPane = createSection("Картичка промет:     " + String.format("%.2f", karticaTotal));
-        GridPane printtotalPane = createSection("Вкупен промет:       " + String.format("%.2f", total));
         // Add a title
         Label titleLabel = new Label("Преглед по вработен - " + employeeName);
         titleLabel.setStyle("-fx-font-size: 18;-fx-font-weight: bold;");
@@ -2959,16 +2949,15 @@ public class RestaurantApp extends Application {
         layout.setPadding(new Insets(10));
         layout.getChildren().addAll(titleLabel, detailsPane, fiscalPane, invoicePane,karticaPane, totalPane, deletedItemsSection,printButton);
 
-        VBox printlayout = new VBox();
-        printlayout.setSpacing(5); // Add spacing between sections
-        printlayout.setStyle("-fx-font-size: 16;");
-        printlayout.setPadding(new Insets(10));
-        printlayout.getChildren().addAll(printtitleLabel, printdetailsPane, printfiscalPane, printinvoicePane,printikarticaPane, printtotalPane);
-        printlayout.setAlignment(Pos.CENTER);
 
+        double finalFiscalTotal = fiscalTotal;
+        double finalInvoiceTotal = invoiceTotal;
+        double finalKarticaTotal = karticaTotal;
+        String finalTimeFrom = timeFrom;
+        String finalTimeTo = timeTo;
         printButton.setOnAction(_ ->{
             PrinterService printerService = new PrinterService();
-            printerService.printNode(printlayout,400);
+            printerService.printEmployeeOverview(employeeName, finalFiscalTotal, finalInvoiceTotal, finalKarticaTotal,dateFrom,dateTo, finalTimeFrom, finalTimeTo);
         });
 
         // Wrap the layout in a ScrollPane

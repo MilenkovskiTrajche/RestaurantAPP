@@ -481,7 +481,7 @@ public class Admin extends Application {
 
         Label ddvlabel = new Label("ДДВ");
         ComboBox<Integer> ddvComboBox = new ComboBox<>();
-        ddvComboBox.getItems().addAll(18, 15, 5);
+        ddvComboBox.getItems().addAll(18, 10, 5);
         ddvComboBox.setValue(18); // Default DDV value
         ddvComboBox.setPrefWidth(100);
         ddvComboBox.setStyle("-fx-font-size: 18");
@@ -503,6 +503,16 @@ public class Admin extends Application {
         Button saveButton = new Button("Зачувај");
         saveButton.setPrefWidth(130);
         saveButton.setOnAction(_ -> {
+                    if(nazivField.getText().contains("ј") || nazivField.getText().contains("Ј")){
+                        for(int i=0;i<nazivField.getText().length();i++){
+                            if(nazivField.getText().charAt(i)=='ј'){
+                                nazivField.replaceSelection("j");
+                            }
+                            if(nazivField.getText().charAt(i)=='Ј'){
+                                nazivField.replaceSelection("J");
+                            }
+                        }
+                    }
                     saveArticle(nazivField, cenaField, ddvComboBox, tipComboBox, articleTable);
                     nazivField.clear();cenaField.clear();
         });
@@ -510,6 +520,7 @@ public class Admin extends Application {
         Button updateButton = new Button("Промени");
         updateButton.setPrefWidth(130);
         updateButton.setOnAction(_ -> {
+            changeLatters(nazivField.getText());
             updateArticle(nazivField, cenaField, ddvComboBox, tipComboBox, articleTable, articleTable.getSelectionModel().getSelectedItem());
             nazivField.clear();cenaField.clear();
         });
@@ -587,6 +598,28 @@ public class Admin extends Application {
         primaryStage.show();
     }
 
+    private void changeLatters(String zbor){
+        System.out.println(zbor);
+        if(zbor.contains("ј")){
+            zbor.replace('ј','j');
+        }
+        if (zbor.contains("ѓ")){
+            zbor.replace('ѓ','г');
+        }
+        if(zbor.contains("ѕ")){
+            zbor.replace('ѕ','s');
+        }
+        if(zbor.contains("љ")){
+            zbor.replace('љ','л');
+        }
+        if(zbor.contains("њ")){
+            zbor.replace('њ','н');
+        }
+        if(zbor.contains("ќ")){
+            zbor.replace('ќ','к');
+        }
+        System.out.println(zbor);
+    }
     // Load articles into the TableView
     private void loadArticleTable(TableView<String[]> articleTable) {
         articleTable.getItems().clear();
