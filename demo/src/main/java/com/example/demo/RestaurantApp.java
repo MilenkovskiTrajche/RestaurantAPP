@@ -29,7 +29,6 @@ import javafx.scene.input.KeyCode;
 import javafx.stage.StageStyle;
 import javafx.beans.binding.Bindings;
 
-import java.awt.*;
 import java.sql.*;
 import java.sql.Date;
 import java.time.LocalDate;
@@ -503,13 +502,14 @@ public class RestaurantApp extends Application {
                 String btnname = ime + ":" + tn;
                 deleteTableButtonFromGrid(btnname);
             }
-            PrinterService printerService = new PrinterService();
             if(!orderDataPrintKujna.isEmpty()){
-                printerService.printOrder(ime, Integer.parseInt(tn),orderDataPrintKujna,"Нарачка - кујна");
+                PrinterService printerService = new PrinterService();
+                printerService.printOrder(ime, Integer.parseInt(tn),orderDataPrintKujna,"НАРАЧКА - КУJНА");
                 orderDataPrintKujna.clear();
             }
             if(!orderDataPrintShank.isEmpty()){
-                printerService.printOrder(ime, Integer.parseInt(tn), orderDataPrintShank, "Нарачка - шанк");
+                PrinterService printerService = new PrinterService();
+                printerService.printOrder(ime, Integer.parseInt(tn), orderDataPrintShank, "НАРАЧКА - ШАНК");
                 orderDataPrintShank.clear();
             }
             articleStage.close()
@@ -3047,7 +3047,7 @@ public class RestaurantApp extends Application {
         macedonianCharMap.put("f", "ф");
         macedonianCharMap.put("g", "г");
         macedonianCharMap.put("h", "х");
-        macedonianCharMap.put("j", "ј");
+        //macedonianCharMap.put("j", "ј");
         macedonianCharMap.put("k", "к");
         macedonianCharMap.put("l", "л");
         macedonianCharMap.put("z", "з");
@@ -3075,7 +3075,7 @@ public class RestaurantApp extends Application {
         macedonianCharMap.put("F", "Ф");
         macedonianCharMap.put("G", "Г");
         macedonianCharMap.put("H", "Х");
-        macedonianCharMap.put("J", "Ј");
+        //macedonianCharMap.put("J", "Ј");
         macedonianCharMap.put("K", "К");
         macedonianCharMap.put("L", "Л");
         macedonianCharMap.put("Z", "З");
@@ -3088,6 +3088,7 @@ public class RestaurantApp extends Application {
 
         return macedonianCharMap;
     }
+
     public static void main(String[] args) {
         Runtime.getRuntime().addShutdownHook(new Thread(DatabaseConnection::closePool));
         launch(args);

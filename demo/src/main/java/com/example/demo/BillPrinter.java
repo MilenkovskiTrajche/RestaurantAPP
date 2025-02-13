@@ -5,7 +5,10 @@ import javafx.collections.ObservableList;
 import javax.print.*;
 import javax.print.attribute.HashPrintRequestAttributeSet;
 import javax.print.attribute.PrintRequestAttributeSet;
+import java.io.IOException;
 
+
+//ј,ѓ,ј,љ,њ,ќ,џ не ги печати
 public class BillPrinter {
 
     private static final byte[] CUT_PAPER = {0x1B, 0x69}; // ESC i for partial cut, ESC m (0x1B, 0x6D) for full cut
@@ -120,18 +123,69 @@ public class BillPrinter {
 
             if (!jobSent) {
                 System.err.println("Failed to send print job after multiple retries.");
-            }
-
-            // Send cut paper command at the end of the receipt
-            if (jobSent) {
-                //job.print(new SimpleDoc(CUT_PAPER, flavor, null), printAttributes);
+                clearPrintQueue();
+                resetPrinter(printService);
+                sendToPrinter(receiptText);
                 DocPrintJob cutJob = printService.createPrintJob();
                 Doc cutDoc = new SimpleDoc(CUT_PAPER, flavor, null);
                 cutJob.print(cutDoc, printAttributes); // Send cut paper command
             }
 
+            // Send cut paper command at the end of the receipt
+//            if (jobSent) {
+//                //job.print(new SimpleDoc(CUT_PAPER, flavor, null), printAttributes);
+//                DocPrintJob cutJob = printService.createPrintJob();
+//                Doc cutDoc = new SimpleDoc(CUT_PAPER, flavor, null);
+//                cutJob.print(cutDoc, printAttributes); // Send cut paper command
+//            }
+            DocPrintJob cutJob = printService.createPrintJob();
+            Doc cutDoc = new SimpleDoc(CUT_PAPER, flavor, null);
+            cutJob.print(cutDoc, printAttributes); // Send cut paper command
+
         } catch (Exception e) {
             System.out.println("send to printer failed: " + e.getMessage());
+        }
+    }
+    private void resetPrinter(PrintService printService) {
+        try {
+            DocPrintJob resetJob = printService.createPrintJob();
+            DocFlavor flavor = DocFlavor.BYTE_ARRAY.AUTOSENSE;
+            Doc resetDoc = new SimpleDoc(RESET_PRINTER, flavor, null);
+            resetJob.print(resetDoc, null);
+            System.out.println("Printer reset successfully.");
+        } catch (PrintException e) {
+            System.err.println("Failed to reset the printer: " + e.getMessage());
+        }
+    }
+
+    private void clearPrintQueue() {
+        try {
+            String os = System.getProperty("os.name").toLowerCase();
+            if (os.contains("win")) {
+                // Windows command to clear the print spooler
+                ProcessBuilder builder = new ProcessBuilder("cmd.exe", "/c", "net stop spooler");
+                builder.redirectErrorStream(true);
+                Process stopSpooler = builder.start();
+                stopSpooler.waitFor(); // Wait for the spooler to stop
+                System.out.println("Print spooler stopped.");
+
+                // Wait for 5 seconds before restarting
+                Thread.sleep(5000);
+
+                // Start the spooler
+                ProcessBuilder startBuilder = new ProcessBuilder("cmd.exe", "/c", "net start spooler");
+                startBuilder.redirectErrorStream(true);
+                Process startSpooler = startBuilder.start();
+                startSpooler.waitFor(); // Wait for the spooler to start
+                System.out.println("Print spooler restarted.");
+            } else if (os.contains("nix") || os.contains("mac") || os.contains("linux")) {
+                // Linux/Mac command to clear the print queue
+                Process cancelAll = Runtime.getRuntime().exec("cancel -a");
+                cancelAll.waitFor();
+                System.out.println("Print queue cleared on Linux/Mac.");
+            }
+        } catch (IOException | InterruptedException e) {
+            System.err.println("Failed to clear print queue: " + e.getMessage());
         }
     }
     private PrintService findThermalPrinter() {
