@@ -1,22 +1,68 @@
 package com.example.demo;
 import javafx.collections.ObservableList;
+
 import javax.print.*;
 import javax.print.attribute.HashPrintRequestAttributeSet;
 import javax.print.attribute.PrintRequestAttributeSet;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
-//ј,ѓ,ј,љ,њ,ќ,џ не ги печати
 public class PrinterService {
 
     private static final byte[] CUT_PAPER = {0x1B, 0x69}; // ESC i for partial cut, ESC m (0x1B, 0x6D) for full cut
     private static final byte[] RESET_PRINTER = {0x1B, 0x40}; // Reset the printer to default settings
     private static final byte[] SET_CYRILLIC_CODE_PAGE = {0x1B, 0x74, 17}; // ESC t 17 for CP1251 (Windows Cyrillic encoding)
 
-    public void printOrder(String employeeName, int tableNumber, ObservableList<String[]> orderData, String title) {
-        StringBuilder receipt = new StringBuilder();
+    private static PrinterService instance;
+    private final ExecutorService printExecutor;
 
+    // Private constructor
+    private PrinterService() {
+        // Create a single-threaded executor to ensure jobs are executed one by one
+        this.printExecutor = Executors.newSingleThreadExecutor();
+    }
+
+    public static PrinterService getInstance() {
+        if (instance == null) {
+            synchronized (PrinterService.class) {
+                if (instance == null) {
+                    instance = new PrinterService();
+                }
+            }
+        }
+        return instance;
+    }
+
+    // Submit a print job for sequential execution
+    public void submitPrintJob(Runnable printJob) {
+        printExecutor.submit(printJob);
+    }
+
+    public void shutdown() {
+        printExecutor.shutdown();
+        try {
+            if (!printExecutor.awaitTermination(60, TimeUnit.SECONDS)) {
+                printExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            printExecutor.shutdownNow();
+        }
+    }
+
+
+    public static String formatPrice(double price){
+        DecimalFormat formatter = new DecimalFormat("#,###");
+        return formatter.format(price).replace(",", ".");
+    }
+    public Boolean printOrder(String employeeName, int tableNumber, ObservableList<String[]> orderData, String title) {
+        StringBuilder receipt = new StringBuilder();
         // Add title
         receipt.append(centerText(title, 32)).append("\n");
         receipt.append("ВРАБОТЕН: ").append(employeeName).append(" | МАСА: ").append(tableNumber).append("\n");
@@ -37,10 +83,10 @@ public class PrinterService {
         receipt.append("--------------------------------\n");
         receipt.append("\n\n");
         // Send the receipt to the printer
-        sendToPrinter(receipt.toString());
+        return sendToPrinter(receipt.toString());
     }
 
-    public void printEmployeeOverview(String title, double fiscaltotal, double invoicetotal, double karticatotal, LocalDate datefrom, LocalDate dateto, String timefrom, String timeto) {
+    public boolean printEmployeeOverview(String title, double fiscaltotal, double invoicetotal, double karticatotal, LocalDate datefrom, LocalDate dateto, String timefrom, String timeto) {
         StringBuilder receipt = new StringBuilder();
 
         receipt.append("ПРЕГЛЕД ПО ВРАБОТЕН - ").append(title).append("\n");
@@ -52,19 +98,104 @@ public class PrinterService {
         receipt.append("\n");
         receipt.append("--------------------------------\n");
         receipt.append("\n");
-        receipt.append(formatOverview("Фискален промет:", String.valueOf(fiscaltotal))).append("\n");
+        receipt.append(formatOverview("Фискален промет:",formatPrice(fiscaltotal))).append("\n");
         receipt.append("\n");
-        receipt.append(formatOverview("Фактура промет:", String.valueOf(invoicetotal))).append("\n");
+        receipt.append(formatOverview("Фактура промет:", formatPrice(invoicetotal))).append("\n");
         receipt.append("\n");
-        receipt.append(formatOverview("Картица промет:", String.valueOf(karticatotal))).append("\n");
+        receipt.append(formatOverview("Картица промет:", formatPrice(karticatotal))).append("\n");
         receipt.append("\n");
-        receipt.append(formatOverview("Вкупен промет:", String.valueOf(fiscaltotal+invoicetotal+karticatotal))).append("\n");
+        receipt.append(formatOverview("Вкупен промет:", formatPrice(fiscaltotal+invoicetotal+karticatotal))).append("\n");
         receipt.append("--------------------------------\n");
         receipt.append("\n");
         receipt.append("\n\n");
         // Send the receipt to the printer
-        sendToPrinter(receipt.toString());
+        return sendToPrinter(receipt.toString());
     }
+
+    public Boolean printBill(String employeeName, ObservableList<String[]> orderData, double ddv18, double ddv15, double ddv5, double totalPrice) {
+        StringBuilder receipt = new StringBuilder();
+
+        // Add title
+        receipt.append(centerText("СМЕТКА", 32)).append("\n");
+        receipt.append("--------------------------------\n");
+
+        // Add articles
+        receipt.append("Артикли              Кол.  Цена\n");
+        receipt.append("--------------------------------\n");
+
+        for (String[] articleData : orderData) {
+            if (articleData.length >= 4) {
+                String articleName = articleData[0];
+                String quantity = articleData[1];
+                String unitPrice = PrinterService.formatPrice(Double.parseDouble(articleData[2]));
+                String totalPriceForItem = PrinterService.formatPrice(Double.parseDouble(articleData[3]));
+
+                // Format article line
+                receipt.append(formatArticleBill(articleName, quantity, unitPrice, totalPriceForItem)).append("\n");
+            }
+        }
+
+        receipt.append("--------------------------------\n");
+        receipt.append(String.format("ДДВ 18%%: %23.2f\n", ddv18));
+        receipt.append(String.format("ДДВ 10%%: %23.2f\n", ddv15));
+        receipt.append(String.format("ДДВ 5%%:  %23.2f\n", ddv5));
+        receipt.append(String.format("Вкупно ДДВ: %20.2f\n", (ddv18 + ddv15 + ddv5)));
+        receipt.append("--------------------------------\n");
+        receipt.append(String.format("Вкупен промет: %17.2f\n", totalPrice));
+        receipt.append("--------------------------------\n");
+
+        // Add employee and date-time info
+        receipt.append("Вработен: ").append(employeeName).append("\n");
+        receipt.append("Датум: ").append(java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm dd-MM-yyyy"))).append("\n");
+        receipt.append("\n");
+        receipt.append(centerText("ПОВЕЛЕТЕ ПОВТОРНО!\n\n\n",32)).append("\n");
+        receipt.append("\n");
+        // Send the receipt to the printer
+        return sendToPrinter(receipt.toString());
+    }
+    public Boolean printAdminBill(String employeeName, ObservableList<String[]> orderData, double ddv18, double ddv15, double ddv5, double totalPrice,String datum,String vreme) {
+        StringBuilder receipt = new StringBuilder();
+
+        // Add title
+        receipt.append(centerText("СМЕТКА", 32)).append("\n");
+        receipt.append("--------------------------------\n");
+
+        // Add articles
+        receipt.append("Артикли              Кол.  Цена\n");
+        receipt.append("--------------------------------\n");
+
+        for (String[] articleData : orderData) {
+            if (articleData.length >= 4) {
+                String articleName = articleData[0];
+                String quantity = articleData[1];
+                String unitPrice = articleData[2];
+                String totalPriceForItem = articleData[3];
+
+                // Format article line
+                receipt.append(formatArticleBill(articleName, quantity, unitPrice, totalPriceForItem)).append("\n");
+            }
+        }
+
+        receipt.append("--------------------------------\n");
+        receipt.append(String.format("ДДВ 18%%: %23.2f\n", ddv18));
+        receipt.append(String.format("ДДВ 10%%: %23.2f\n", ddv15));
+        receipt.append(String.format("ДДВ 5%%:  %23.2f\n", ddv5));
+        receipt.append(String.format("Вкупно ДДВ: %20.2f\n", (ddv18 + ddv15 + ddv5)));
+        receipt.append("--------------------------------\n");
+        receipt.append(String.format("Вкупен промет: %17.2f\n", totalPrice));
+        receipt.append("--------------------------------\n");
+
+        // Add employee and date-time info
+        receipt.append("Вработен: ").append(employeeName).append("\n");
+        receipt.append("Датум: ").append(datum).append(" ").append(vreme).append("\n");
+        receipt.append("\n");
+        receipt.append(centerText("ПОВЕЛЕТЕ ПОВТОРНО!",32)).append("\n");
+        receipt.append("\n");
+        receipt.append("\n");
+        // Send the receipt to the printer
+        return sendToPrinter(receipt.toString());
+    }
+
     private String formatArticle(String name, String qty) {
         int maxArticleWidth = 25; // Maximum space for article name (adjustable)
 
@@ -95,18 +226,33 @@ public class PrinterService {
         // Format article line with aligned pricing
         return String.format("%s%s %5s", name, spacing, qty);
     }
+    private String formatArticleBill(String name, String qty, String price, String total) {
+        int maxArticleWidth = 20; // Maximum space for article name (adjustable)
+
+        // Shorten long article names
+        if (name.length() > maxArticleWidth) {
+            name = name.substring(0, maxArticleWidth);
+        }
+
+        // Calculate dynamic spacing
+        int spacesNeeded = maxArticleWidth - name.length();
+        String spacing = " ".repeat(spacesNeeded);
+
+        // Format article line with aligned pricing
+        return String.format("%s%s %2s x %4s |%5s", name, spacing, qty, price, total);
+    }
     private String centerText(String text, int width) {
         int padSize = (width - text.length()) / 2;
         return " ".repeat(Math.max(0, padSize)) + text;
     }
 
-    private void sendToPrinter(String receiptText) {
+    private Boolean sendToPrinter(String receiptText) {
         try {
             // Find the thermal printer (e.g., Bixolon)
             PrintService printService = findThermalPrinter();
             if (printService == null) {
-                System.err.println("No Bixolon receipt printer found.");
-                return;
+                RestaurantApp.showAlert("Не е најден принтерот - bixolon");
+                return false;
             }
 
             // Open a raw print job
@@ -132,41 +278,30 @@ public class PrinterService {
                 try {
                     Doc doc = new SimpleDoc(combinedBytes, flavor, null);
                     job.print(doc, printAttributes);
-                    jobSent = true;  // Job successfully sent
+                    jobSent = true; // Job successfully sent
                 } catch (PrintException e) {
-                    if (e.getMessage().contains("already printing")) {
-                        System.err.println("Printer is already printing, retrying...");
-                        Thread.sleep(1000);  // Wait for 1 second before retrying
-                        retries--;
-                    } else {
-                        throw e;  // Other exceptions are rethrown
-                    }
+                    retries--;
+                    RestaurantApp.showAlert("Printer busy. Retrying... (" + retries + " retries left)");
+                    Thread.sleep(2000); // Wait for 2 seconds before retrying
                 }
             }
 
             if (!jobSent) {
-                System.err.println("Failed to send print job after multiple retries.");
                 clearPrintQueue();
                 resetPrinter(printService);
-                sendToPrinter(receiptText);
                 DocPrintJob cutJob = printService.createPrintJob();
                 Doc cutDoc = new SimpleDoc(CUT_PAPER, flavor, null);
                 cutJob.print(cutDoc, printAttributes); // Send cut paper command
+                return false;
             }
-
-            // Send cut paper command at the end of the receipt
-//            if (jobSent) {
-//                //job.print(new SimpleDoc(CUT_PAPER, flavor, null), printAttributes);
-//                DocPrintJob cutJob = printService.createPrintJob();
-//                Doc cutDoc = new SimpleDoc(CUT_PAPER, flavor, null);
-//                cutJob.print(cutDoc, printAttributes); // Send cut paper command
-//            }
             DocPrintJob cutJob = printService.createPrintJob();
             Doc cutDoc = new SimpleDoc(CUT_PAPER, flavor, null);
             cutJob.print(cutDoc, printAttributes); // Send cut paper command
-
+            return true;
         } catch (Exception e) {
-            System.out.println("send to printer failed: " + e.getMessage());
+            clearPrintQueue();
+            RestaurantApp.showAlert("Грешка при испраќање до принтер: " + e.getMessage());
+            return false;
         }
     }
     private void resetPrinter(PrintService printService) {
@@ -175,42 +310,39 @@ public class PrinterService {
             DocFlavor flavor = DocFlavor.BYTE_ARRAY.AUTOSENSE;
             Doc resetDoc = new SimpleDoc(RESET_PRINTER, flavor, null);
             resetJob.print(resetDoc, null);
-            System.out.println("Printer reset successfully.");
+            RestaurantApp.showAlertInformation("Принтерот се рестартира усшено");
         } catch (PrintException e) {
-            System.err.println("Failed to reset the printer: " + e.getMessage());
+            RestaurantApp.showAlert("Принтерот неможе да се рестартира");
         }
     }
 
-    private void clearPrintQueue() {
+    public void clearPrintQueue() {
         try {
+            // Check the operating system
             String os = System.getProperty("os.name").toLowerCase();
             if (os.contains("win")) {
-                // Windows command to clear the print spooler
-                ProcessBuilder builder = new ProcessBuilder("cmd.exe", "/c", "net stop spooler");
-                builder.redirectErrorStream(true);
-                Process stopSpooler = builder.start();
-                stopSpooler.waitFor(); // Wait for the spooler to stop
-                System.out.println("Print spooler stopped.");
+                // Generate the VBScript dynamically (optional)
+                generateVBSFile();
 
-                // Wait for 5 seconds before restarting
-                Thread.sleep(5000);
+                // Run the VBScript with wscript
+                ProcessBuilder builder = new ProcessBuilder("wscript", "clearPrintQueue.vbs");
+                builder.redirectErrorStream(true); // Redirect errors to the output stream
+                Process process = builder.start();
 
-                // Start the spooler
-                ProcessBuilder startBuilder = new ProcessBuilder("cmd.exe", "/c", "net start spooler");
-                startBuilder.redirectErrorStream(true);
-                Process startSpooler = startBuilder.start();
-                startSpooler.waitFor(); // Wait for the spooler to start
-                System.out.println("Print spooler restarted.");
-            } else if (os.contains("nix") || os.contains("mac") || os.contains("linux")) {
-                // Linux/Mac command to clear the print queue
-                Process cancelAll = Runtime.getRuntime().exec("cancel -a");
-                cancelAll.waitFor();
-                System.out.println("Print queue cleared on Linux/Mac.");
+                // Wait for the process to complete
+                int exitCode = process.waitFor();
+
+                if (exitCode == 0) {
+                    RestaurantApp.showAlertInformation("Print spooler restarted");
+                } else {
+                    RestaurantApp.showAlert("Неуспешно, нема admin привилегии");
+                }
             }
         } catch (IOException | InterruptedException e) {
-            System.err.println("Failed to clear print queue: " + e.getMessage());
+            RestaurantApp.showAlert("Грешка при чистење на принтерот:\n" + e.getMessage());
         }
     }
+
 
 
     private PrintService findThermalPrinter() {
@@ -222,6 +354,21 @@ public class PrinterService {
         }
         return PrintServiceLookup.lookupDefaultPrintService(); // Use default printer if no match found
     }
+    private void generateVBSFile() throws IOException {
+        String vbsContent = """
+        Set UAC = CreateObject("Shell.Application")
+        UAC.ShellExecute "cmd.exe", "/c net stop spooler && timeout /t 5 && net start spooler", "", "runas", 1
+        """;
+
+        // Get the path to the current working directory
+        String scriptPath = System.getProperty("user.dir") + File.separator + "clearPrintQueue.vbs";
+
+        // Write the VBScript content to a file
+        try (FileWriter writer = new FileWriter(scriptPath)) {
+            writer.write(vbsContent);
+        }
+    }
+
+
 
 }
-

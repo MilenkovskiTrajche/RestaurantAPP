@@ -1,6 +1,5 @@
 package com.example.demo;
 
-
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
 import javafx.application.Application;
@@ -256,6 +255,7 @@ public class RestaurantApp extends Application {
 
         // Dynamic font size for labels
         imevraboten.styleProperty().bind(Bindings.concat("-fx-font-size: ", screenWidth / 50, "px;"));
+        totalPriceLabel.prefWidthProperty().bind(orderTable.widthProperty().multiply(0.40)); // 30%
         totalPriceLabel.styleProperty().bind(Bindings.concat("-fx-padding: 0 0 0 10;-fx-border-color: gray;-fx-font-weight: bold;-fx-font-size: ", screenWidth / 50, "px;"));
         bottombox.setPadding(new Insets(0,20,0,15));
         bottombox.getChildren().addAll(imevraboten,totalPriceLabel);
@@ -305,37 +305,37 @@ public class RestaurantApp extends Application {
 
     // Create the TableView for displaying the order (right side)
     private TableView<String[]> createOrderTable(String nm,int employeeId) {
-            TableView<String[]> tableView = new TableView<>();
+        TableView<String[]> tableView = new TableView<>();
 
-            TableColumn<String[], String> idColumn = new TableColumn<>("ID");
-            idColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[0]));
-            //idColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.10)); // 30%
+        TableColumn<String[], String> idColumn = new TableColumn<>("ID");
+        idColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[0]));
+        //idColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.10)); // 30%
 
-            TableColumn<String[], String> nazivColumn = new TableColumn<>("Артикл");
-            nazivColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[1]));
-            nazivColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.48)); // 30%
+        TableColumn<String[], String> nazivColumn = new TableColumn<>("Артикл");
+        nazivColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[1]));
+        nazivColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.48)); // 30%
 
-            TableColumn<String[], String> cenaColumn = new TableColumn<>("Цена");
-            cenaColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[2]));
-            cenaColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.15)); // 30%
+        TableColumn<String[], String> cenaColumn = new TableColumn<>("Цена");
+        cenaColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[2]));
+        cenaColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.15)); // 30%
 
-            TableColumn<String[], String> kolicinaColumn = new TableColumn<>("Количина");
-            kolicinaColumn.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue()[3])));
-            kolicinaColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.10)); // 30%
+        TableColumn<String[], String> kolicinaColumn = new TableColumn<>("Количина");
+        kolicinaColumn.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue()[3])));
+        kolicinaColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.10)); // 30%
 
-            TableColumn<String[], String> vremeColumn = new TableColumn<>("Време");
-            vremeColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[4]));  // Time is in the 5th position
-            vremeColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.20)); // 30%
+        TableColumn<String[], String> vremeColumn = new TableColumn<>("Време");
+        vremeColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue()[4]));  // Time is in the 5th position
+        vremeColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.20)); // 30%
 
-            tableView.styleProperty().bind(Bindings.concat("-fx-font-size: ", tableView.widthProperty().divide(25).asString(), "px;"));
+        tableView.styleProperty().bind(Bindings.concat("-fx-font-size: ", tableView.widthProperty().divide(25).asString(), "px;"));
 
-            // Add columns to the TableView
-            //tableView.getColumns().addAll(idColumn, nazivColumn, cenaColumn, kolicinaColumn, vremeColumn);
-            tableView.getColumns().addAll(nazivColumn, cenaColumn, kolicinaColumn, vremeColumn);
+        // Add columns to the TableView
+        //tableView.getColumns().addAll(idColumn, nazivColumn, cenaColumn, kolicinaColumn, vremeColumn);
+        tableView.getColumns().addAll(nazivColumn, cenaColumn, kolicinaColumn, vremeColumn);
 
-            loadPreviousOrders(nm,employeeId);
-            tableView.setItems(AllData);
-            return tableView;
+        loadPreviousOrders(nm,employeeId);
+        tableView.setItems(AllData);
+        return tableView;
     }
 
     // Create middle section for input fields and buttons
@@ -503,14 +503,26 @@ public class RestaurantApp extends Application {
                 deleteTableButtonFromGrid(btnname);
             }
             if(!orderDataPrintKujna.isEmpty()){
-                PrinterService printerService = new PrinterService();
-                printerService.printOrder(ime, Integer.parseInt(tn),orderDataPrintKujna,"НАРАЧКА - КУJНА");
-                orderDataPrintKujna.clear();
+                PrinterService printerService = PrinterService.getInstance();
+                printerService.submitPrintJob(() -> {
+                    boolean print = printerService.printOrder(ime, Integer.parseInt(tn), orderDataPrintKujna, "НАРАЧКА - КУJНА");
+                    if (!print) {
+                        printerService.clearPrintQueue();
+                        printerService.printOrder(ime, Integer.parseInt(tn), orderDataPrintKujna, "НАРАЧКА - КУJНА");
+                    }
+                    orderDataPrintKujna.clear();
+                });
             }
             if(!orderDataPrintShank.isEmpty()){
-                PrinterService printerService = new PrinterService();
-                printerService.printOrder(ime, Integer.parseInt(tn), orderDataPrintShank, "НАРАЧКА - ШАНК");
-                orderDataPrintShank.clear();
+                PrinterService printerService = PrinterService.getInstance();
+                printerService.submitPrintJob(() -> {
+                    boolean print = printerService.printOrder(ime, Integer.parseInt(tn), orderDataPrintShank, "НАРАЧКА - ШАНК");
+                    if (!print) {
+                        printerService.clearPrintQueue();
+                        printerService.printOrder(ime, Integer.parseInt(tn), orderDataPrintShank, "НАРАЧКА - ШАНК");
+                    }
+                    orderDataPrintShank.clear();
+                });
             }
             articleStage.close()
             ;});
@@ -892,7 +904,7 @@ public class RestaurantApp extends Application {
                 "INNER JOIN Naracka N ON sn.NarackaId = N.Id " +
                 "WHERE VrabotenShifra = ? AND NarackaId = ? AND ArtiklId = ? AND Kolicina = ?";
         try (Connection conn = DatabaseConnection.getConnection();
-                PreparedStatement statement = conn.prepareStatement(query)) {
+             PreparedStatement statement = conn.prepareStatement(query)) {
             statement.setInt(1, employeeId);
             statement.setInt(2, narackaId);
             statement.setInt(3, artiklId);
@@ -1060,9 +1072,19 @@ public class RestaurantApp extends Application {
                     }
                 }
             }
-            BillPrinter billPrinter = new BillPrinter();
-            billPrinter.printBill(imevraboten, smetkaData, ddv18, ddv10, ddv5 , totalPrice);
-
+            PrinterService printerService = PrinterService.getInstance();
+            String finalImevraboten = imevraboten;
+            double finalDdv1 = ddv18;
+            double finalDdv2 = ddv10;
+            double finalDdv = ddv5;
+            int finalTotalPrice = totalPrice;
+            printerService.submitPrintJob(()->{
+            boolean print = printerService.printBill(finalImevraboten, smetkaData, finalDdv1, finalDdv2, finalDdv, finalTotalPrice);
+            if(!print){
+                printerService.clearPrintQueue();
+                printerService.printBill(finalImevraboten, smetkaData, finalDdv1, finalDdv2, finalDdv, finalTotalPrice);
+            }
+            });
             conn.commit();
 
         } catch (SQLException ex) {
@@ -1115,15 +1137,19 @@ public class RestaurantApp extends Application {
                 }
             }
 
-            String imevraboten="";
+            String imevraboten="";String datum="";String vreme="";
             try (PreparedStatement stmt = conn.prepareStatement("""
-                        select ime from vraboten where shifra = ?
+                        select vrabotenime as ime,TO_CHAR(datum,'DD-MM-YYYY') as datum,TO_CHAR(datum,'HH24:MI:SS') as vreme
+                        from smetka
+                        where id= ? ;
                         """)) {
-                stmt.setInt(1, employeeId);  // The employee ID
+                stmt.setInt(1, smetkaId);  // The employee ID
 
                 try (ResultSet rs = stmt.executeQuery()) {
                     while (rs.next()) {
                         imevraboten = rs.getString("ime");
+                        datum =rs.getString("datum");
+                        vreme =rs.getString("vreme");
                     }
                 }
             }
@@ -1157,9 +1183,22 @@ public class RestaurantApp extends Application {
                     }
                 }
             }
-            BillPrinter billPrinter = new BillPrinter();
-            billPrinter.printBill(imevraboten, smetkaData, ddv18, ddv10, ddv5 , totalPrice);
 
+            PrinterService printerService = PrinterService.getInstance();
+            String finalImevraboten = imevraboten;
+            double finalDdv1 = ddv18;
+            double finalDdv2 = ddv10;
+            double finalDdv = ddv5;
+            int finalTotalPrice = totalPrice;
+            String finalDatum = datum;
+            String finalVreme = vreme;
+            printerService.submitPrintJob(()-> {
+                        boolean print = printerService.printAdminBill(finalImevraboten, smetkaData, finalDdv1, finalDdv2, finalDdv, finalTotalPrice, finalDatum, finalVreme);
+                        if (!print) {
+                            printerService.clearPrintQueue();
+                            printerService.printAdminBill(finalImevraboten, smetkaData, finalDdv1, finalDdv2, finalDdv, finalTotalPrice, finalDatum, finalVreme);
+                        }
+                    });
             conn.commit();
 
         } catch (SQLException ex) {
@@ -1443,7 +1482,7 @@ public class RestaurantApp extends Application {
         return null;
     }
 
-     //Add article to the order
+    //Add article to the order
     private void addToOrder(String[] selectedArticle, int quantity, String tn, int employeeId) {
         String[] orderItem = new String[5];
         orderItem[0] = selectedArticle[0];
@@ -1665,7 +1704,7 @@ public class RestaurantApp extends Application {
         }
     }
 
-        private int getOrCreateOrderId(Connection conn, String tableNumber, int employeeId) throws SQLException {
+    private int getOrCreateOrderId(Connection conn, String tableNumber, int employeeId) throws SQLException {
         try (PreparedStatement stmt = conn.prepareStatement("SELECT Id FROM Naracka WHERE Masa = ? AND VrabotenShifra = ? AND Status = 'active'")) {
             stmt.setInt(1, Integer.parseInt(tableNumber));
             stmt.setInt(2, employeeId);
@@ -2956,8 +2995,14 @@ public class RestaurantApp extends Application {
         String finalTimeFrom = timeFrom;
         String finalTimeTo = timeTo;
         printButton.setOnAction(_ ->{
-            PrinterService printerService = new PrinterService();
-            printerService.printEmployeeOverview(employeeName, finalFiscalTotal, finalInvoiceTotal, finalKarticaTotal,dateFrom,dateTo, finalTimeFrom, finalTimeTo);
+            PrinterService printerService = PrinterService.getInstance();
+            printerService.submitPrintJob(()-> {
+                boolean print = printerService.printEmployeeOverview(employeeName, finalFiscalTotal, finalInvoiceTotal, finalKarticaTotal, dateFrom, dateTo, finalTimeFrom, finalTimeTo);
+                if (!print) {
+                    printerService.clearPrintQueue();
+                    printerService.printEmployeeOverview(employeeName, finalFiscalTotal, finalInvoiceTotal, finalKarticaTotal, dateFrom, dateTo, finalTimeFrom, finalTimeTo);
+                }
+            });
         });
 
         // Wrap the layout in a ScrollPane
@@ -3047,7 +3092,7 @@ public class RestaurantApp extends Application {
         macedonianCharMap.put("f", "ф");
         macedonianCharMap.put("g", "г");
         macedonianCharMap.put("h", "х");
-        //macedonianCharMap.put("j", "ј");
+        macedonianCharMap.put("j", "j");
         macedonianCharMap.put("k", "к");
         macedonianCharMap.put("l", "л");
         macedonianCharMap.put("z", "з");
@@ -3075,7 +3120,7 @@ public class RestaurantApp extends Application {
         macedonianCharMap.put("F", "Ф");
         macedonianCharMap.put("G", "Г");
         macedonianCharMap.put("H", "Х");
-        //macedonianCharMap.put("J", "Ј");
+        macedonianCharMap.put("J", "J");
         macedonianCharMap.put("K", "К");
         macedonianCharMap.put("L", "Л");
         macedonianCharMap.put("Z", "З");
@@ -3091,6 +3136,11 @@ public class RestaurantApp extends Application {
 
     public static void main(String[] args) {
         Runtime.getRuntime().addShutdownHook(new Thread(DatabaseConnection::closePool));
+        // Add a shutdown hook to close the database connection pool
+        Runtime.getRuntime().addShutdownHook(new Thread(DatabaseConnection::closePool));
+
+        // Add a shutdown hook to shut down the PrinterService
+        Runtime.getRuntime().addShutdownHook(new Thread(PrinterService.getInstance()::shutdown));
         launch(args);
     }
 }
