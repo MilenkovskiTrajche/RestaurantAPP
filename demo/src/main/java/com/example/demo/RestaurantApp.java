@@ -68,6 +68,7 @@ public class RestaurantApp extends Application {
     private TableView<String[]> leftAdminTable = new TableView<>();
     private final ObservableList<String[]> rezultatiAdmin = FXCollections.observableArrayList();
     private TableView<String[]> rightAdminResultTable = new TableView<>();
+    private final TextField popustvrednost = new TextField();
 
     @Override
     public void start(Stage primaryStage) {
@@ -382,11 +383,16 @@ public class RestaurantApp extends Application {
         Button transferButton = new Button("F5|Префрли маса");
         Button transferArticleButton = new Button("F4|Префрли артикл");
         Button prefrlikelner = new Button("F10|Префрли келнер");
+        Button izbrishise = new Button("Избриши ги сите");
+        Button razdeli = new Button("Подели сметка");
+
+        TextField popustfield = new TextField();
+        Button popustbtn = new Button("Пресметај");
 
         // Define button list for easy iteration
         List<Button> buttons = Arrays.asList(
                 smetkaButton, fakturasmetkaButton, deleteButton,
-                addArticleButton, escButton, transferButton, transferArticleButton,prefrlikelner,karticasmetkaButton
+                addArticleButton, escButton, transferButton, transferArticleButton,prefrlikelner,karticasmetkaButton,izbrishise,razdeli
         );
 
         // Apply styles dynamically
@@ -481,7 +487,8 @@ public class RestaurantApp extends Application {
             if(quantityInputField.getText().isEmpty()){
                 quantityInputField.setText("1");
             }
-            onAddArticle(tn, employeeId);});
+            onAddArticle(tn, employeeId);
+        });
 
         escButton.setOnAction(_ -> {
             tableGrid.getChildren().clear();
@@ -649,11 +656,9 @@ public class RestaurantApp extends Application {
                     // Modify the article name (second element in the array)
                     deletedItem[3] = "-" + deletedItem[3];
                     if(checktipShankArtikl(Integer.parseInt(selectedItem[0]))){
-                        //orderDataPrintShank.remove(selectedItem);
                         orderDataPrintShank.add(deletedItem);     // Add the modified version
                     }
                     if(!checktipShankArtikl(Integer.parseInt(selectedItem[0]))){
-                        //orderDataPrintKujna.remove(selectedItem);
                         orderDataPrintKujna.add(deletedItem);     // Add the modified version
                     }
                     orderData.remove(selectedItem);
@@ -669,6 +674,96 @@ public class RestaurantApp extends Application {
                 }
             });
         });
+
+        izbrishise.setOnAction(_ -> {
+            if (AllData.isEmpty()) {
+                showAlertInformation("Нема нарачки за бришење!");
+                return;
+            }
+            // Confirmation dialog
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("Избриши артикли");
+            alert.setHeaderText("Дали сте сигурни за бришење на сите артикли од нарачката?");
+            alert.showAndWait().ifPresent(response -> {
+                if (response == ButtonType.OK) {
+                    try (Connection conn = DatabaseConnection.getConnection()) {
+                        conn.setAutoCommit(false);
+                        // Insert deleted articles into the database
+                        for (String[] article : AllData) {
+                            int articleId = Integer.parseInt(article[0]);
+                            int quantity = Integer.parseInt(article[3]);
+
+                            String insertIzbrihaniQuery = "INSERT INTO izbrishani (Masa, VrabotenShifra, artiklID, kolicina) VALUES (?, ?, ?, ?)";
+                            try (PreparedStatement stmt = conn.prepareStatement(insertIzbrihaniQuery)) {
+                                stmt.setInt(1, Integer.parseInt(tn));
+                                stmt.setInt(2, employeeId);
+                                stmt.setInt(3, articleId);
+                                stmt.setInt(4, quantity);
+                                stmt.executeUpdate();
+                            }
+
+                            // Prepare data for printing
+                            String[] deletedItem = article.clone();
+                            deletedItem[3] = "-" + deletedItem[3];
+                            boolean isShankArticle = checktipShankArtikl(articleId);
+                            if (isShankArticle) {
+                                orderDataPrintShank.add(deletedItem);
+                            } else {
+                                orderDataPrintKujna.add(deletedItem);
+                            }
+                        }
+
+                        // Fetch and delete order data
+                        int narackaid = 0;
+                        String getNarackaIdQuery = "SELECT id FROM naracka WHERE vrabotenshifra = ? AND masa = ? AND status = 'active'";
+                        try (PreparedStatement stmt = conn.prepareStatement(getNarackaIdQuery)) {
+                            stmt.setInt(1, employeeId);
+                            stmt.setInt(2, Integer.parseInt(tn));
+                            ResultSet rs = stmt.executeQuery();
+                            if (rs.next()) {
+                                narackaid = rs.getInt("id");
+                            }
+                        }
+
+                        // Delete order items
+                        String deleteStavkaNarackaQuery = "DELETE FROM stavkanaracka WHERE narackaid = ?";
+                        try (PreparedStatement stmt = conn.prepareStatement(deleteStavkaNarackaQuery)) {
+                            stmt.setInt(1, narackaid);
+                            stmt.executeUpdate();
+                        }
+
+                        // Delete order
+                        String deleteNarackaQuery = "DELETE FROM naracka WHERE id = ?";
+                        try (PreparedStatement stmt = conn.prepareStatement(deleteNarackaQuery)) {
+                            stmt.setInt(1, narackaid);
+                            stmt.executeUpdate();
+                        }
+
+                        // Commit transaction
+                        conn.commit();
+
+                        // Clear local data and refocus
+                        AllData.clear();
+                        orderData.clear();
+                        if (AllData.isEmpty()) {
+                            escButton.fire();
+                        }
+                        Platform.runLater(articleInputField::requestFocus);
+
+                    } catch (SQLException e) {
+                        showAlert(e.getMessage());
+                        try (Connection conn = DatabaseConnection.getConnection()) {
+                            conn.rollback();
+                        } catch (SQLException rollbackEx) {
+                            showAlert("Rollback failed: " + rollbackEx.getMessage());
+                        }
+                    }
+                } else {
+                    System.out.println("Откажано бришење.");
+                }
+            });
+        });
+
 
         //Префрли маса button
         //transferButton.setAlignment(Pos.CENTER_LEFT);
@@ -830,7 +925,9 @@ public class RestaurantApp extends Application {
                             updateVrabotenShifra(employeeId,Integer.parseInt(tn), Integer.parseInt(newShifra));
                             AllData.clear(); // Clear orders for the current table
                             orderData.clear();
+                            prefrluvanjeDatabase(employeeId,Integer.parseInt(tn), Integer.parseInt(newShifra));
                             escButton.fire();
+
                             validinput = true;
                         } else {
                             showAlertInformation("Погрешна шифра.Обиди се повторно");
@@ -892,12 +989,102 @@ public class RestaurantApp extends Application {
         separator.setAlignment(Pos.BASELINE_LEFT);
         separator.setPrefHeight(screenHeight*0.15);
 
+        Label popustlbl = new Label("----ПОПУСТ----");
+        popustlbl.setAlignment(Pos.CENTER);
+        popustlbl.setMaxWidth(middleWidth * 0.95);
+        popustlbl.styleProperty().bind(Bindings.concat("-fx-font-size: ", middleWidth / 40, "px;"));
+
+        int pps=getpopust(tn,employeeId);
+        popustfield.setText(String.valueOf(pps));
+        popustfield.setMaxWidth(middleWidth * 0.95);
+        popustfield.styleProperty().bind(Bindings.concat("-fx-font-size: ", middleWidth / 40, "px;"));
+        setMaxInputLength(popustfield,2);
+
+
+        popustvrednost.setMaxWidth(middleWidth * 0.95);
+        popustvrednost.styleProperty().bind(Bindings.concat("-fx-font-size: ", middleWidth /40, "px;"));
+        popustvrednost.setDisable(true);
+
+        popustbtn.setMaxWidth(middleWidth * 0.95);
+        popustbtn.styleProperty().bind(Bindings.concat("-fx-font-size: ", middleWidth / 40, "px;"));
+
+        popustbtn.setOnAction(event -> {
+            if(popustfield.getText().trim().isEmpty()){
+                return;
+            }
+            int popust = 0;
+            try {
+               popust = Integer.parseInt(popustfield.getText().trim());
+               if(popust < 0) {
+                   showAlert("Внеси број поголем од 0");
+                   popustfield.setText("");
+                   return;
+               }
+               if(popust == 0){
+                   popustvrednost.setText("0");
+               }
+           }catch (NumberFormatException e) {
+               showAlert("Грешен формат за попуст.Внеси број!");
+               return;
+           }
+
+            popustfield.setText(String.valueOf(popust));
+            Platform.runLater(articleInputField::requestFocus);
+            insertPopustIntoDatabase(popust,tn,employeeId);
+            updateTotalPrice(tn,employeeId);
+        });
+        popustfield.setOnKeyPressed(event -> {
+            if(event.getCode() == KeyCode.ENTER) {
+                popustbtn.fire();
+            }
+        });
+        Platform.runLater(articleInputField::requestFocus);
+
+        HBox bottomButtonsBox5 = new HBox(20);  // 20px spacing between buttons
+        bottomButtonsBox.setAlignment(Pos.BASELINE_LEFT);  // Align buttons at the center
+        popustvrednost.prefWidthProperty().bind(bottomButtonsBox.widthProperty().divide(3));
+        popustfield.prefWidthProperty().bind(bottomButtonsBox.widthProperty().divide(3));
+        popustbtn.prefWidthProperty().bind(bottomButtonsBox.widthProperty().divide(3));
+        // Add buttons to the bottom section
+        bottomButtonsBox5.getChildren().addAll(popustfield,popustbtn,popustvrednost);
+        VBox separator2 = new VBox(20);
+        separator2.setAlignment(Pos.BASELINE_LEFT);
+        separator2.setPrefHeight(screenHeight*0.15);
+
         // Add all components to the VBox
-        middleBox.getChildren().addAll(articleLabel, articleInputField, quantityLabel, quantityInputField, bottomButtonsBox4,separator, bottomButtonsBox,bottomButtonsBox2,bottomButtonsBox3);
+        middleBox.getChildren().addAll(articleLabel, articleInputField, quantityLabel, quantityInputField, bottomButtonsBox4,separator, bottomButtonsBox,bottomButtonsBox2,bottomButtonsBox3,izbrishise,separator2,popustlbl,bottomButtonsBox5);
 
         return middleBox;
     }
 
+    private void insertPopustIntoDatabase(int popustvrednost,String tn,int employeeID) {
+        String deleteSourceOrderQuery = "update naracka set popust= ? where masa = ? and vrabotenshifra = ? and status='active';";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(deleteSourceOrderQuery)) {
+            stmt.setInt(1, popustvrednost);
+            stmt.setInt(2, Integer.parseInt(tn));
+            stmt.setInt(3, employeeID);
+            stmt.executeUpdate();
+        } catch (SQLException ex) {
+            showAlert("insert popust exception " + ex.getMessage());
+        }
+    }
+    private int getpopust(String tn, int employeeID){
+        int popustvrednost=0;
+        String deleteSourceOrderQuery = "select popust from naracka where masa = ? and vrabotenshifra = ? and status='active';";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(deleteSourceOrderQuery)) {
+            stmt.setInt(1, Integer.parseInt(tn));
+            stmt.setInt(2, employeeID);
+            ResultSet rs = stmt.executeQuery();
+            if(rs.next()) {
+                popustvrednost=rs.getInt("popust");
+            }
+        } catch (SQLException ex) {
+            showAlert("getPopust exception " + ex.getMessage());
+        }
+        return popustvrednost;
+    }
 
     private int getStavkaNarackaId(int employeeId, int narackaId, int artiklId, int kolicina) throws SQLException {
         String query = "SELECT sn.id FROM StavkaNaracka AS sn " +
@@ -939,24 +1126,38 @@ public class RestaurantApp extends Application {
                         }
                     }
                 }
+            }
 
-                try (PreparedStatement stmt = conn.prepareStatement("select ime from vraboten where shifra = ?")) {
-                    stmt.setInt(1, employeeId);
-                    try (ResultSet rs = stmt.executeQuery()) {
-                        if (rs.next()) {
-                            imevraboten = rs.getString("ime");
-                        }
+            try (PreparedStatement stmt = conn.prepareStatement("select ime from vraboten where shifra = ?")) {
+                stmt.setInt(1, employeeId);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        imevraboten = rs.getString("ime");
                     }
                 }
             }
-
+            int popust=0;
+            try (PreparedStatement stmt = conn.prepareStatement("select popust from naracka where vrabotenshifra = ? and masa = ? and status='active';")) {
+                stmt.setInt(1, employeeId);
+                stmt.setInt(2, Integer.parseInt(tn));
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        popust = rs.getInt("popust");
+                    }
+                }
+            }
+            int novacena = totalPrice;
+            if(popust>0){
+                novacena = novacena - novacena*popust/100;
+            }
             // Insert the bill (Smetka)
             int smetkaId;
-            try (PreparedStatement stmt = conn.prepareStatement("INSERT INTO Smetka (VrabotenShifra, Masa, Vkupno,vrabotenime) VALUES (?, ?, ?,?) RETURNING Id")) {
+            try (PreparedStatement stmt = conn.prepareStatement("INSERT INTO Smetka (VrabotenShifra, Masa, Vkupno,vrabotenime,popust) VALUES (?, ?, ?,?,?) RETURNING Id")) {
                 stmt.setInt(1, employeeId);  // The employee ID
                 stmt.setInt(2, Integer.parseInt(tn));  // The table number (tn)
-                stmt.setInt(3, totalPrice);
+                stmt.setInt(3, novacena);
                 stmt.setString(4,imevraboten);
+                stmt.setInt(5,popust);
                 try (ResultSet rs = stmt.executeQuery()) {
                     if (rs.next()) {
                         smetkaId = rs.getInt("Id");
@@ -988,7 +1189,6 @@ public class RestaurantApp extends Application {
                             }
                         }
                     }
-
                     // Insert each item into StavkaNaSmetka
                     stmt.setInt(1, smetkaId);
                     stmt.setInt(2, articleId);
@@ -998,6 +1198,7 @@ public class RestaurantApp extends Application {
                     stmt.executeUpdate();
                 }
             }
+
             try (PreparedStatement updatetip = conn.prepareStatement("update smetka set tip = ? where smetka.id = ?;")) {
                 updatetip.setString(1, tipSmetka);
                 updatetip.setInt(2, smetkaId);
@@ -1011,8 +1212,6 @@ public class RestaurantApp extends Application {
                 deleteStmt.executeUpdate();
             }
 
-            // Commit the transaction
-            //conn.commit();
             double ddv18 = 0.0;
             double ddv10 = 0.0;
             double ddv5 = 0.0;
@@ -1072,6 +1271,8 @@ public class RestaurantApp extends Application {
                     }
                 }
             }
+            int popustvred = (totalPrice*popust)/100;
+            // Add the data to the ObservableList
             PrinterService printerService = PrinterService.getInstance();
             String finalImevraboten = imevraboten;
             double finalDdv1 = ddv18;
@@ -1562,6 +1763,12 @@ public class RestaurantApp extends Application {
 
     private void updateTotalPrice(String tn,int employeeId) {
         int vk_cena = getTotalPrice(tn, employeeId);
+        int popust = getpopust(tn,employeeId);
+        if(popust>0){
+            int ppsvalue = (vk_cena * popust) /100;
+            vk_cena = vk_cena - vk_cena*popust/100;
+            popustvrednost.setText("-" + String.valueOf(ppsvalue) + "мкд.");
+        }
         totalPriceLabel.setText("Вкупно: " + vk_cena);
     }
 
@@ -1645,6 +1852,21 @@ public class RestaurantApp extends Application {
             System.out.println("Error retrieving order ID: " + e);
         }
         return -1;  // Return -1 if no valid order ID is found
+    }
+
+    private void prefrluvanjeDatabase(int employeeid, int masa,int prefrlenvraboten) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            try (PreparedStatement stmt = conn.prepareStatement(
+                    "insert into prefrluvanje (employeeid, newemployeeid, masa) values (?,?,?)")) {
+                stmt.setInt(1, employeeid);
+                stmt.setInt(2, prefrlenvraboten);
+                stmt.setInt(3, masa);
+                stmt.executeUpdate();
+            }
+
+        } catch (SQLException e) {
+            System.out.println("prefrluvanje sql exception: " + e);
+        }
     }
 
 
@@ -2180,11 +2402,33 @@ public class RestaurantApp extends Application {
         izleziButton.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
         izleziButton.setOnAction(_ -> adminStage.close());
 
+        Button pregledpoprefrleni = new Button("Преглед по префрлени");
+        pregledpoprefrleni.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.30));
+        pregledpoprefrleni.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
+        pregledpoprefrleni.setOnAction(_ -> {
+            setupRightPrefrli();
+            adminfakturabtn.setDisable(true);
+            adminfiskalnabtn.setDisable(true);
+            if(timeFromField.getText().length() < 4 || timeToField.getText().length() < 4) {
+                timeFromField.setText("00:00");
+                timeToField.setText(LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")));
+            }
+            executePrefrliQuery(datefrom.getValue(), dateto.getValue(), timeFromField.getText(), timeToField.getText());
+        });
+
+        Button restartirajPrinter = new Button("Рестартирај принтер");
+        restartirajPrinter.prefWidthProperty().bind(leftAdminTable.widthProperty().multiply(0.30));
+        restartirajPrinter.styleProperty().bind(Bindings.concat("-fx-font-size: ", leftAdminTable.widthProperty().divide(50), "px;"));
+        restartirajPrinter.setOnAction(_ -> {
+            PrinterService printerService = PrinterService.getInstance();
+            printerService.clearPrintQueue();
+        });
+
         // Layout for the exit button
         HBox pregledi = new HBox(10,pregledArikliliButton,pregledpoddv,izbrishaniButton);
         pregledi.setAlignment(Pos.BOTTOM_LEFT);
         pregledi.setPadding(new Insets(10));
-        HBox exitBox = new HBox(10,izleziButton);
+        HBox exitBox = new HBox(10,pregledpoprefrleni,restartirajPrinter,izleziButton);
         exitBox.setAlignment(Pos.BOTTOM_LEFT);
         exitBox.setPadding(new Insets(10));
 
@@ -2587,6 +2831,43 @@ public class RestaurantApp extends Application {
         }
     }
 
+    private void setupRightPrefrli() {
+        try {
+            rightAdminResultTable.getColumns().clear();
+            rightAdminResultTable.getItems().clear();
+
+            // Create columns
+            TableColumn<String[], String> employeecolumn = new TableColumn<>("Келнер");
+            employeecolumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.22)); // 30%
+            TableColumn<String[], String> masacolumn = new TableColumn<>("Маса");
+            masacolumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.10)); // 30%
+            TableColumn<String[], String> novkelner = new TableColumn<>("Нов Келнер");
+            novkelner.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.22)); // 30%
+            TableColumn<String[], String> vremecolumn = new TableColumn<>("Време");
+            vremecolumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.20)); // 30%
+            TableColumn<String[], String> datumcolumn = new TableColumn<>("Датум");
+            datumcolumn.prefWidthProperty().bind(rightAdminResultTable.widthProperty().multiply(0.20)); // 30%
+
+            // Set cell value factories
+            employeecolumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[0]));
+            masacolumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[1]));
+            novkelner.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[2]));
+            vremecolumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[3]));
+            datumcolumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue()[4]));
+
+
+            // Bind font size dynamically based on table width
+            rightAdminResultTable.styleProperty().bind(Bindings.concat("-fx-font-size: ",
+                    rightAdminResultTable.widthProperty().divide(35).asString(), "px;"));
+            // Add columns to the TableView
+            rightAdminResultTable.getColumns().addAll(employeecolumn, masacolumn,novkelner,vremecolumn,datumcolumn);
+        }catch (IndexOutOfBoundsException e){
+            showAlert("Грешка додека се креира табелата. Обиди се повторно!");
+            rightAdminResultTable.getColumns().clear();
+            rightAdminResultTable.getItems().clear();
+        }
+    }
+
     private void executeArtikliQuery(LocalDate dateFrom, LocalDate dateTo, String vremeod, String vremedo,String vrabotenshifra,String tipSmetka) {
         try {
             // Ensure the time string is in the format HH:MM:SS
@@ -2655,6 +2936,66 @@ public class RestaurantApp extends Application {
                 String[] row = new String[]{
                         rs.getString("naziv"),
                         rs.getString("kolicina"),
+                };
+                rezultatiAdmin.add(row);
+            }
+
+            // Close resources
+            rs.close();
+            ps.close();
+            conn.close();
+
+            // Update TableView
+            rightAdminResultTable.setItems(rezultatiAdmin);
+            rightAdminResultTable.refresh();
+        } catch (SQLException e) {
+            showAlert(e.getMessage());
+        }
+    }
+    private void executePrefrliQuery(LocalDate dateFrom, LocalDate dateTo, String vremeod, String vremedo) {
+        try {
+            // Ensure the time string is in the format HH:MM:SS
+            if (vremeod.length() == 5) {
+                vremeod += ":00"; // Append seconds
+            }
+            if (vremedo.length() == 5) {
+                vremedo += ":59"; // Append seconds
+            }
+            // Base query
+            String query = """
+            select v.ime as vrabotenime,masa,v1.ime as prefrlen,to_char(datum,'HH24:MI:SS') as vreme,to_char(datum,'dd-mm-yyyy') as datum
+            from prefrluvanje as p
+            inner join vraboten as v on p.employeeid = v.shifra
+            inner join vraboten as v1 on p.newemployeeid = v1.shifra
+            WHERE (datum >= ?::timestamp + ?::time)
+              AND (datum <= ?::timestamp + ?::time)
+        """;
+
+
+            // Establish database connection
+            Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement ps = conn.prepareStatement(query);
+
+            // Set the common parameters
+            ps.setDate(1, Date.valueOf(dateFrom)); // Date from
+            ps.setTime(2, Time.valueOf(vremeod)); // Time from
+            ps.setDate(3, Date.valueOf(dateTo)); // Date to
+            ps.setTime(4, Time.valueOf(vremedo)); // Time to
+
+            // Execute query
+            ResultSet rs = ps.executeQuery();
+
+            // Clear previous data
+            rezultatiAdmin.clear();
+
+            // Add results to the ObservableList
+            while (rs.next()) {
+                String[] row = new String[]{
+                        rs.getString("vrabotenime"),
+                        rs.getString("masa"),
+                        rs.getString("prefrlen"),
+                        rs.getString("vreme"),
+                        rs.getString("datum")
                 };
                 rezultatiAdmin.add(row);
             }
@@ -2753,12 +3094,12 @@ public class RestaurantApp extends Application {
         try {
             // SQL query with explicit type casting for date comparison
             String query = """
-                select a.Naziv,sn.Kolicina,a.Cena as cena,a.Cena*sn.Kolicina as vkupno,DATE(Datum) as datum,TO_CHAR(vreme, 'HH24:MI:SS') AS vreme,v.ime as ime,SmetkaId,s.vrabotenshifra as vrabotenshifra
-                from smetka as s
-                left outer join vraboten as v on s.vrabotenshifra = v.shifra
-                inner join stavkanasmetka as sn on s.Id = sn.SmetkaId
-                inner join artikl as a on sn.ArtiklId = a.Id
-                where SmetkaId = ?;
+               select a.Naziv,sn.Kolicina,a.Cena as cena,(a.Cena*sn.Kolicina) - (a.Cena*sn.Kolicina) * s.popust / 100 as vkupno,DATE(Datum) as datum,TO_CHAR(vreme, 'HH24:MI:SS') AS vreme,v.ime as ime,SmetkaId,s.vrabotenshifra as vrabotenshifra
+                                from smetka as s
+                                         left outer join vraboten as v on s.vrabotenshifra = v.shifra
+                                         inner join stavkanasmetka as sn on s.Id = sn.SmetkaId
+                                         inner join artikl as a on sn.ArtiklId = a.Id
+                                where SmetkaId = ?;
             """;
 
             // Establish a connection to the database
