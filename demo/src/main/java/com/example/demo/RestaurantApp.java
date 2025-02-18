@@ -331,7 +331,6 @@ public class RestaurantApp extends Application {
         tableView.styleProperty().bind(Bindings.concat("-fx-font-size: ", tableView.widthProperty().divide(25).asString(), "px;"));
 
         // Add columns to the TableView
-        //tableView.getColumns().addAll(idColumn, nazivColumn, cenaColumn, kolicinaColumn, vremeColumn);
         tableView.getColumns().addAll(nazivColumn, cenaColumn, kolicinaColumn, vremeColumn);
 
         loadPreviousOrders(nm,employeeId);
@@ -1008,7 +1007,7 @@ public class RestaurantApp extends Application {
         popustbtn.setMaxWidth(middleWidth * 0.95);
         popustbtn.styleProperty().bind(Bindings.concat("-fx-font-size: ", middleWidth / 40, "px;"));
 
-        popustbtn.setOnAction(event -> {
+        popustbtn.setOnAction(_ -> {
             if(popustfield.getText().trim().isEmpty()){
                 return;
             }
@@ -1215,7 +1214,7 @@ public class RestaurantApp extends Application {
             double ddv18 = 0.0;
             double ddv10 = 0.0;
             double ddv5 = 0.0;
-            double ddvValue = 0.0;
+            double ddvValue;
 
             try (PreparedStatement stmt = conn.prepareStatement("""
                 SELECT a.ddv, SUM(a.ddv_value) AS sumaDDV
@@ -1271,7 +1270,6 @@ public class RestaurantApp extends Application {
                     }
                 }
             }
-            int popustvred = (totalPrice*popust)/100;
             // Add the data to the ObservableList
             PrinterService printerService = PrinterService.getInstance();
             String finalImevraboten = imevraboten;
@@ -1311,7 +1309,7 @@ public class RestaurantApp extends Application {
             double ddv18 = 0.0;
             double ddv10 = 0.0;
             double ddv5 = 0.0;
-            double ddvValue = 0.0;
+            double ddvValue;
 
             try (PreparedStatement stmt = conn.prepareStatement("""
                 SELECT a.ddv, SUM(a.ddv_value) AS sumaDDV
@@ -2067,15 +2065,10 @@ public class RestaurantApp extends Application {
             if (checkPassword(enteredPassword)) {
                 handleTableEntry(enteredTable, enteredPassword);
                 // Clear fields after processing
-                tableField.setText("");
-                passwordField.setText("");
-                Platform.runLater(passwordField::requestFocus);
-            } else {
-                // If password is incorrect, clear the fields and reset focus
-                tableField.setText("");
-                passwordField.setText("");
-                Platform.runLater(passwordField::requestFocus);
             }
+            tableField.setText("");
+            passwordField.setText("");
+            Platform.runLater(passwordField::requestFocus);
         }
     }
 
@@ -2118,8 +2111,7 @@ public class RestaurantApp extends Application {
     }
     static void ReadArticles() {
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement("SELECT id, naziv, cena FROM artikl\n" +
-                     "order by id;");
+             PreparedStatement stmt = conn.prepareStatement("SELECT id, naziv, cena FROM artikl order by id");
              ResultSet rs = stmt.executeQuery()) {
 
             // Process the result set and dynamically add articles
