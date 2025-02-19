@@ -108,7 +108,11 @@ public class RestaurantApp extends Application {
         // Vertical Line Separator
         Region separator = new Region();
         separator.setPrefWidth(screenWidth * 0.005);
-        separator.setBackground(new Background(new BackgroundFill(Color.BLACK, CornerRadii.EMPTY, Insets.EMPTY)));
+        try {
+            separator.setBackground(new Background(new BackgroundFill(Color.BLACK, CornerRadii.EMPTY, Insets.EMPTY)));
+        }catch (Exception e){
+            showAlert(e.getMessage());
+        }
 
         // Handle Enter key for tableField
         tableField.setOnAction(_ -> {
@@ -714,7 +718,7 @@ public class RestaurantApp extends Application {
 
                         // Fetch and delete order data
                         int narackaid = 0;
-                        String getNarackaIdQuery = "SELECT id FROM naracka WHERE vrabotenshifra = ? AND masa = ? AND status = 'active'";
+                        String getNarackaIdQuery = "SELECT id FROM naracka WHERE vrabotenshifra = ? AND masa = ? ";
                         try (PreparedStatement stmt = conn.prepareStatement(getNarackaIdQuery)) {
                             stmt.setInt(1, employeeId);
                             stmt.setInt(2, Integer.parseInt(tn));
@@ -1057,7 +1061,7 @@ public class RestaurantApp extends Application {
     }
 
     private void insertPopustIntoDatabase(int popustvrednost,String tn,int employeeID) {
-        String deleteSourceOrderQuery = "update naracka set popust= ? where masa = ? and vrabotenshifra = ? and status='active';";
+        String deleteSourceOrderQuery = "update naracka set popust= ? where masa = ? and vrabotenshifra = ? ;";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(deleteSourceOrderQuery)) {
             stmt.setInt(1, popustvrednost);
@@ -1070,7 +1074,7 @@ public class RestaurantApp extends Application {
     }
     private int getpopust(String tn, int employeeID){
         int popustvrednost=0;
-        String deleteSourceOrderQuery = "select popust from naracka where masa = ? and vrabotenshifra = ? and status='active';";
+        String deleteSourceOrderQuery = "select popust from naracka where masa = ? and vrabotenshifra = ? ;";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(deleteSourceOrderQuery)) {
             stmt.setInt(1, Integer.parseInt(tn));
@@ -1126,37 +1130,24 @@ public class RestaurantApp extends Application {
                     }
                 }
             }
+            int tipSmetkaID;
+            try (PreparedStatement stmt = conn.prepareStatement("select id from tipsmetka where tip = ?")) {
+                stmt.setString(1, tipSmetka);  // The employee ID
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        tipSmetkaID = rs.getInt("Id");
+                    } else {
+                        throw new SQLException("Failed to insert Smetka.");
+                    }
+                }
+            }
 
-            try (PreparedStatement stmt = conn.prepareStatement("select ime from vraboten where shifra = ?")) {
-                stmt.setInt(1, employeeId);
-                try (ResultSet rs = stmt.executeQuery()) {
-                    if (rs.next()) {
-                        imevraboten = rs.getString("ime");
-                    }
-                }
-            }
-            int popust=0;
-            try (PreparedStatement stmt = conn.prepareStatement("select popust from naracka where vrabotenshifra = ? and masa = ? and status='active';")) {
-                stmt.setInt(1, employeeId);
-                stmt.setInt(2, Integer.parseInt(tn));
-                try (ResultSet rs = stmt.executeQuery()) {
-                    if (rs.next()) {
-                        popust = rs.getInt("popust");
-                    }
-                }
-            }
-            int novacena = totalPrice;
-            if(popust>0){
-                novacena = novacena - novacena*popust/100;
-            }
             // Insert the bill (Smetka)
             int smetkaId;
-            try (PreparedStatement stmt = conn.prepareStatement("INSERT INTO Smetka (VrabotenShifra, Masa, Vkupno,vrabotenime,popust) VALUES (?, ?, ?,?,?) RETURNING Id")) {
+            try (PreparedStatement stmt = conn.prepareStatement("INSERT INTO Smetka (VrabotenShifra, Masa,tip) VALUES (?, ?,?) RETURNING Id")) {
                 stmt.setInt(1, employeeId);  // The employee ID
                 stmt.setInt(2, Integer.parseInt(tn));  // The table number (tn)
-                stmt.setInt(3, novacena);
-                stmt.setString(4,imevraboten);
-                stmt.setInt(5,popust);
+                stmt.setInt(3,tipSmetkaID);
                 try (ResultSet rs = stmt.executeQuery()) {
                     if (rs.next()) {
                         smetkaId = rs.getInt("Id");
@@ -1167,7 +1158,7 @@ public class RestaurantApp extends Application {
             }
 
             // Insert items into StavkaNaSmetka
-            try (PreparedStatement stmt = conn.prepareStatement("INSERT INTO StavkaNaSmetka (SmetkaId, ArtiklId, Kolicina, Cena,vreme) VALUES (?, ?, ?, ?,?)")) {
+            try (PreparedStatement stmt = conn.prepareStatement("INSERT INTO StavkaNaSmetka (SmetkaId, ArtiklId, Kolicina,vreme) VALUES (?, ?, ?,?)")) {
                 for (String[] row : AllData) {
                     int articleId = Integer.parseInt(row[0]);  // Assuming ID is in the first column
                     int quantity = Integer.parseInt(row[3]);   // Assuming Quantity is in the fourth column
@@ -1175,35 +1166,14 @@ public class RestaurantApp extends Application {
                     if(vreme.length() == 5){
                         vreme += ":00";
                     }
-
-                    // Get the price for each item
-                    double price;
-                    try (PreparedStatement priceStmt = conn.prepareStatement("SELECT Cena FROM Artikl WHERE Id = ?")) {
-                        priceStmt.setInt(1, articleId);
-                        try (ResultSet rs = priceStmt.executeQuery()) {
-                            if (rs.next()) {
-                                price = rs.getDouble("Cena");
-                            } else {
-                                throw new SQLException("Артикл со шифра " + articleId + " не постои.");
-                            }
-                        }
-                    }
                     // Insert each item into StavkaNaSmetka
                     stmt.setInt(1, smetkaId);
                     stmt.setInt(2, articleId);
                     stmt.setInt(3, quantity);
-                    stmt.setDouble(4, price);
-                    stmt.setTime(5, Time.valueOf(vreme));
+                    stmt.setTime(4, Time.valueOf(vreme));
                     stmt.executeUpdate();
                 }
             }
-
-            try (PreparedStatement updatetip = conn.prepareStatement("update smetka set tip = ? where smetka.id = ?;")) {
-                updatetip.setString(1, tipSmetka);
-                updatetip.setInt(2, smetkaId);
-                updatetip.executeUpdate();
-            }
-
             // Delete the order (Naracka)
             try (PreparedStatement deleteStmt = conn.prepareStatement("DELETE FROM Naracka WHERE Masa = ? AND VrabotenShifra = ?")) {
                 deleteStmt.setInt(1, Integer.parseInt(tn));
@@ -1217,12 +1187,12 @@ public class RestaurantApp extends Application {
             double ddvValue;
 
             try (PreparedStatement stmt = conn.prepareStatement("""
-                SELECT a.ddv, SUM(a.ddv_value) AS sumaDDV
-                FROM smetka AS s
-                INNER JOIN public.stavkanasmetka s2 ON s.id = s2.smetkaid
-                INNER JOIN public.artikl a ON s2.artiklid = a.id
-                WHERE smetkaid = ?
-                GROUP BY a.ddv;
+                select a.ddv,ROUND(SUM(sn.kolicina * a.cena) * a.ddv / (100.0 + a.ddv), 2) AS sumaDDV
+                from smetka as s
+                inner join stavkanasmetka as sn on s.id = sn.smetkaid
+                inner join artikl as a on sn.artiklid = a.id
+                where s.id = ?
+                group by a.ddv;
                 """)) {
 
                 stmt.setInt(1, smetkaId);
@@ -1243,7 +1213,7 @@ public class RestaurantApp extends Application {
 
             try (PreparedStatement stmt = conn.prepareStatement("""
                         select A.Naziv as artikli,sum(SNS.Kolicina) as Kolicina,MAX(A.Cena) as cena_Artikl,sum(SNS.Kolicina*A.Cena) as vkupno
-                        from Smetka as s
+                        from smetka as s
                         inner join StavkaNaSmetka SNS on s.Id = SNS.SmetkaId
                         inner join vraboten as v on s.VrabotenShifra = v.Shifra
                         inner join Artikl A on SNS.ArtiklId = A.Id
@@ -1272,16 +1242,15 @@ public class RestaurantApp extends Application {
             }
             // Add the data to the ObservableList
             PrinterService printerService = PrinterService.getInstance();
-            String finalImevraboten = imevraboten;
             double finalDdv1 = ddv18;
             double finalDdv2 = ddv10;
             double finalDdv = ddv5;
             int finalTotalPrice = totalPrice;
             printerService.submitPrintJob(()->{
-            boolean print = printerService.printBill(finalImevraboten, smetkaData, finalDdv1, finalDdv2, finalDdv, finalTotalPrice);
+            boolean print = printerService.printBill(imevraboten, smetkaData, finalDdv1, finalDdv2, finalDdv, finalTotalPrice);
             if(!print){
                 printerService.clearPrintQueue();
-                printerService.printBill(finalImevraboten, smetkaData, finalDdv1, finalDdv2, finalDdv, finalTotalPrice);
+                printerService.printBill(imevraboten, smetkaData, finalDdv1, finalDdv2, finalDdv, finalTotalPrice);
             }
             });
             conn.commit();
@@ -1312,13 +1281,13 @@ public class RestaurantApp extends Application {
             double ddvValue;
 
             try (PreparedStatement stmt = conn.prepareStatement("""
-                SELECT a.ddv, SUM(a.ddv_value) AS sumaDDV
-                FROM smetka AS s
-                INNER JOIN public.stavkanasmetka s2 ON s.id = s2.smetkaid
-                INNER JOIN public.artikl a ON s2.artiklid = a.id
-                WHERE smetkaid = ?
-                GROUP BY a.ddv;
-                """)) {
+                select a.ddv,ROUND(SUM(sn.kolicina * a.cena) * a.ddv / (100.0 + a.ddv), 2) AS sumaDDV
+                from smetka as s
+                inner join stavkanasmetka as sn on s.id = sn.smetkaid
+                inner join artikl as a on sn.artiklid = a.id
+                where s.id = ?
+                group by a.ddv;
+              """)) {
 
                 stmt.setInt(1, smetkaId);
 
@@ -1338,8 +1307,8 @@ public class RestaurantApp extends Application {
 
             String imevraboten="";String datum="";String vreme="";
             try (PreparedStatement stmt = conn.prepareStatement("""
-                        select vrabotenime as ime,TO_CHAR(datum,'DD-MM-YYYY') as datum,TO_CHAR(datum,'HH24:MI:SS') as vreme
-                        from smetka
+                        select v.ime as ime,TO_CHAR(datum,'DD-MM-YYYY') as datum,TO_CHAR(datum,'HH24:MI:SS') as vreme
+                        from smetka as s inner join vraboten as v on s.vrabotenshifra = v.shifra
                         where id= ? ;
                         """)) {
                 stmt.setInt(1, smetkaId);  // The employee ID
@@ -1355,7 +1324,7 @@ public class RestaurantApp extends Application {
             int totalPrice=0;
             try (PreparedStatement stmt = conn.prepareStatement("""
                         select A.Naziv as artikli,sum(SNS.Kolicina) as Kolicina,MAX(A.Cena) as cena_Artikl,sum(SNS.Kolicina*A.Cena) as vkupno
-                        from Smetka as s
+                        from smetka as s
                         inner join StavkaNaSmetka SNS on s.Id = SNS.SmetkaId
                         inner join vraboten as v on s.VrabotenShifra = v.Shifra
                         inner join Artikl A on SNS.ArtiklId = A.Id
@@ -1420,7 +1389,7 @@ public class RestaurantApp extends Application {
     private void updateVrabotenShifra(int currentVrabotenShifra, int masa, int newVrabotenShifra) {
         String querySelectExistingOrder = """
         SELECT Id FROM Naracka
-        WHERE Masa = ? AND VrabotenShifra = ? AND Status = 'active';
+        WHERE Masa = ? AND VrabotenShifra = ? ;
     """;
         String queryMergeStavka = """
         UPDATE StavkaNaracka
@@ -1539,8 +1508,8 @@ public class RestaurantApp extends Application {
 
             // Step 2: Add the article to the target order
             String transferArticleQuery = """
-            INSERT INTO StavkaNaracka (NarackaId, ArtiklId, Kolicina, Cena,vreme)
-            SELECT ?, ArtiklId, ?, Cena,vreme
+            INSERT INTO StavkaNaracka (NarackaId, ArtiklId, Kolicina,vreme)
+            SELECT ?, ArtiklId, ?,vreme
             FROM StavkaNaracka
             WHERE NarackaId = ? AND ArtiklId = ? and id = ?;
         """;
@@ -1606,8 +1575,8 @@ public class RestaurantApp extends Application {
 
             // Step 2: Transfer items from the source table to the target table
             String transferItemsQuery = """
-            INSERT INTO StavkaNaracka (NarackaId, ArtiklId, Kolicina, Cena,vreme)
-            SELECT ?, ArtiklId, Kolicina, Cena,vreme
+            INSERT INTO StavkaNaracka (NarackaId, ArtiklId, Kolicina,vreme)
+            SELECT ?, ArtiklId, Kolicina,vreme
             FROM StavkaNaracka
             WHERE NarackaId = (SELECT Id FROM Naracka WHERE Masa = ? AND VrabotenShifra = ?);
         """;
@@ -1716,7 +1685,10 @@ public class RestaurantApp extends Application {
     private boolean checktipShankArtikl(int idArtikl) {
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement("""
-                     select tip from artikl where id = ?;
+                     SELECT ta.tip
+                     FROM Artikl as a
+                     inner join tipartikl as ta on a.tip = ta.id
+                     where a.id = ?;
                     """)) {
 
             stmt.setInt(1,idArtikl);
@@ -1744,7 +1716,7 @@ public class RestaurantApp extends Application {
                      FROM StavkaNaracka as sn
                      JOIN Naracka as n ON sn.NarackaId = n.Id
                      JOIN Artikl as a ON sn.ArtiklId = a.Id
-                     WHERE n.Masa = ? AND n.VrabotenShifra = ? AND n.Status = 'active') as zemi_cena""")) {
+                     WHERE n.Masa = ? AND n.VrabotenShifra = ? ) as zemi_cena""")) {
 
             stmt.setInt(1, Integer.parseInt(tn));
             stmt.setInt(2, employeeId);
@@ -1786,7 +1758,7 @@ public class RestaurantApp extends Application {
                      From stavkanaracka sn
                      inner join Naracka N on sn.NarackaId = N.Id
                      inner join Artikl A on A.Id = sn.ArtiklId
-                     where n.masa = ? and n.vrabotenshifra = ? and n.Status = 'active';
+                     where n.masa = ? and n.vrabotenshifra = ? ;
                      """)) {
 
             stmt.setInt(1, Integer.parseInt(tableNumber));
@@ -1832,7 +1804,7 @@ public class RestaurantApp extends Application {
             String query = "SELECT n.id FROM StavkaNaracka sn " +
                     "JOIN Naracka n ON sn.NarackaId = n.Id " +
                     "JOIN Artikl a ON sn.ArtiklId = a.Id " +
-                    "WHERE n.Masa = ? AND n.VrabotenShifra = ? AND n.Status = 'active';";
+                    "WHERE n.Masa = ? AND n.VrabotenShifra = ? ;";
             try (PreparedStatement stmt = conn.prepareStatement(query)) {
                 // Set the parameters for the query
                 stmt.setInt(1, tableNumber);
@@ -1900,12 +1872,11 @@ public class RestaurantApp extends Application {
         try (Connection conn = DatabaseConnection.getConnection()) {
             int orderId = getOrCreateOrderId(conn, tableNumber, employeeId);
             try (PreparedStatement stmt = conn.prepareStatement(
-                    "INSERT INTO StavkaNaracka (NarackaId, ArtiklId, Kolicina, Cena,vreme) VALUES (?, ?, ?, (SELECT Cena FROM Artikl WHERE Id = ?),?)")) {
+                    "INSERT INTO StavkaNaracka (NarackaId, ArtiklId, Kolicina,vreme) VALUES (?, ?, ?,?)")) {
                 stmt.setInt(1, orderId);
                 stmt.setInt(2, articleId);
                 stmt.setInt(3, quantity);
-                stmt.setInt(4, articleId);
-                stmt.setTime(5, Time.valueOf(LocalTime.now()));
+                stmt.setTime(4, Time.valueOf(LocalTime.now()));
                 stmt.executeUpdate();
             }
         } catch (SQLException e) {
@@ -1915,7 +1886,7 @@ public class RestaurantApp extends Application {
     private void changeTipSmetka(int smetkaID) {
         try (Connection conn = DatabaseConnection.getConnection()) {
             try (PreparedStatement stmt = conn.prepareStatement(
-                    "update smetka set tip = 'фискална' where id = ?;")) {
+                    "update smetka set tip = (select ID from tipsmetka where tip = 'фискална') where id = ?;")) {
                 stmt.setInt(1, smetkaID);
                 stmt.executeUpdate();
             }
@@ -1925,7 +1896,7 @@ public class RestaurantApp extends Application {
     }
 
     private int getOrCreateOrderId(Connection conn, String tableNumber, int employeeId) throws SQLException {
-        try (PreparedStatement stmt = conn.prepareStatement("SELECT Id FROM Naracka WHERE Masa = ? AND VrabotenShifra = ? AND Status = 'active'")) {
+        try (PreparedStatement stmt = conn.prepareStatement("SELECT Id FROM Naracka WHERE Masa = ? AND VrabotenShifra = ?")) {
             stmt.setInt(1, Integer.parseInt(tableNumber));
             stmt.setInt(2, employeeId);
             try (ResultSet rs = stmt.executeQuery()) {
@@ -2536,12 +2507,14 @@ public class RestaurantApp extends Application {
 
             // Base query
             String query = """
-            SELECT smetka.vrabotenime as ime, id, masa, Vkupno, TO_CHAR(Datum, 'DD-MM-YYYY') as datum, TO_CHAR(Datum, 'HH24:MI:SS') as vreme, Smetka.tip
-            FROM smetka
-                     left outer join vraboten AS v ON smetka.VrabotenShifra = v.Shifra
+            SELECT v.ime as ime, s.id, s.masa, sum(SNS.Kolicina*A.Cena) as vkupno, TO_CHAR(Datum, 'DD-MM-YYYY') as datum, TO_CHAR(Datum, 'HH24:MI:SS') as vreme, ts.tip
+            FROM smetka as s
+            inner join vraboten AS v ON s.VrabotenShifra = v.Shifra
+            inner join stavkanasmetka as sns on s.id = sns.smetkaid
+            inner join artikl as a on sns.artiklid = a.id
+            inner join tipSmetka tS on s.tip = tS.ID
             WHERE (Datum >= ?::timestamp + ?::time)
               AND (Datum <= ?::timestamp + ?::time)
-              and smetka.vrabotenime is not null
         """;
 
             // Dynamically add conditions
@@ -2549,11 +2522,15 @@ public class RestaurantApp extends Application {
             boolean filterByShifrav = !shifrav.equals("сите");
 
             if (filterByTipSmetka) {
-                query += " AND Smetka.tip = ?";
+                query += " AND ts.tip = ? ";
             }
             if (filterByShifrav) {
-                query += " AND v.Shifra = ?";
+                query += " AND v.Shifra = ? ";
             }
+
+            query+= """
+            group by v.ime,s.id,s.masa,ts.tip;
+            """;
 
             // Establish a connection to the database
             Connection conn = DatabaseConnection.getConnection();
@@ -2618,13 +2595,13 @@ public class RestaurantApp extends Application {
 
             // Base query
             String query = """
-            select a.ddv,SUM(a.ddv_value)AS ddv_vrednost
-            from stavkanasmetka as sn
-            inner join artikl as a on sn.ArtiklId = a.Id
-            inner join smetka as s on sn.SmetkaId = s.Id
+            select a.ddv,ROUND(SUM(sn.kolicina * a.cena) * a.ddv / (100.0 + a.ddv), 2) AS sumaDDV
+            from smetka as s
+            inner join stavkanasmetka as sn on s.id = sn.smetkaid
+            inner join artikl as a on sn.artiklid = a.id
+            inner join tipSmetka tS on s.tip = tS.ID
             WHERE (s.Datum >= ?::timestamp + ?::time)
               AND (s.Datum <= ?::timestamp + ?::time)
-              AND s.vrabotenime is not null
         """;
 
             // Dynamically add conditions
@@ -2632,7 +2609,7 @@ public class RestaurantApp extends Application {
             boolean filterByShifrav = !vrabotenshifra.equals("сите");
 
             if (filterByTipSmetka) {
-                query += " AND s.tip = ?";
+                query += " AND ts.tip = ?";
             }
             if (filterByShifrav) {
                 query += " AND s.vrabotenshifra = ?";
@@ -2675,7 +2652,7 @@ public class RestaurantApp extends Application {
             while (rs.next()) {
                 String[] row = new String[]{
                         rs.getString("ddv"),
-                        rs.getString("ddv_vrednost"),
+                        rs.getString("sumaDDV"),
                 };
                 rezultatiAdmin.add(row);
             }
@@ -2872,13 +2849,13 @@ public class RestaurantApp extends Application {
 
             // Base query
             String query = """
-            select a.naziv, sum(kolicina) as kolicina
+            select a.naziv, sum(sn.kolicina) as kolicina
             from smetka as s
             inner join stavkanasmetka as sn on s.id = sn.smetkaid
             inner join artikl as a on a.id = sn.artiklid
+            inner join tipSmetka tS on s.tip = tS.ID
             WHERE (Datum >= ?::timestamp + ?::time)
               AND (Datum <= ?::timestamp + ?::time)
-              AND s.vrabotenime is not null
         """;
 
             // Dynamically add conditions
@@ -2886,7 +2863,7 @@ public class RestaurantApp extends Application {
             boolean filterByShifrav = !vrabotenshifra.equals("сите");
 
             if (filterByTipSmetka) {
-                query += " AND s.tip = ?";
+                query += " AND ts.tip = ?";
             }
             if (filterByShifrav) {
                 query += " AND s.vrabotenshifra = ?";
@@ -3086,12 +3063,12 @@ public class RestaurantApp extends Application {
         try {
             // SQL query with explicit type casting for date comparison
             String query = """
-               select a.Naziv,sn.Kolicina,a.Cena as cena,(a.Cena*sn.Kolicina) - (a.Cena*sn.Kolicina) * s.popust / 100 as vkupno,DATE(Datum) as datum,TO_CHAR(vreme, 'HH24:MI:SS') AS vreme,v.ime as ime,SmetkaId,s.vrabotenshifra as vrabotenshifra
-                                from smetka as s
-                                         left outer join vraboten as v on s.vrabotenshifra = v.shifra
-                                         inner join stavkanasmetka as sn on s.Id = sn.SmetkaId
-                                         inner join artikl as a on sn.ArtiklId = a.Id
-                                where SmetkaId = ?;
+               select a.Naziv,sn.Kolicina,a.Cena as cena,(a.Cena*sn.Kolicina)as vkupno,DATE(s.Datum) as datum,TO_CHAR(sn.vreme, 'HH24:MI:SS') AS vreme,v.ime as ime,sn.SmetkaId,s.vrabotenshifra as vrabotenshifra
+               FROM smetka as s
+               inner join vraboten as v on s.vrabotenshifra = v.shifra
+               inner join stavkanasmetka as sn on s.Id = sn.SmetkaId
+               inner join artikl as a on sn.ArtiklId = a.Id
+               where s.id = ?;
             """;
 
             // Establish a connection to the database
@@ -3146,11 +3123,14 @@ public class RestaurantApp extends Application {
 
         // SQL query
         String query = """
-            SELECT SUM(Vkupno) AS Suma
-            FROM Smetka
+            SELECT SUM(sns.kolicina*a.cena) AS Suma
+            FROM smetka as s
+            inner join stavkanasmetka as sns on s.id = sns.smetkaid
+            inner join artikl as a on sns.artiklid = a.id
+            inner join tipSmetka tS on s.tip = tS.ID
             WHERE (Datum >= ?::timestamp + ?::time)
               AND (Datum <= ?::timestamp + ?::time)
-              AND tip = ?
+              AND ts.tip = ?
         """;
 
         String deletedItemsQuery = """
@@ -3469,9 +3449,6 @@ public class RestaurantApp extends Application {
 
     public static void main(String[] args) {
         Runtime.getRuntime().addShutdownHook(new Thread(DatabaseConnection::closePool));
-        // Add a shutdown hook to close the database connection pool
-        Runtime.getRuntime().addShutdownHook(new Thread(DatabaseConnection::closePool));
-
         // Add a shutdown hook to shut down the PrinterService
         Runtime.getRuntime().addShutdownHook(new Thread(PrinterService.getInstance()::shutdown));
         launch(args);

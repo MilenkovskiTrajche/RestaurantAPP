@@ -64,7 +64,7 @@ public class PrinterService {
     public Boolean printOrder(String employeeName, int tableNumber, ObservableList<String[]> orderData, String title) {
         StringBuilder receipt = new StringBuilder();
         // Add title
-        receipt.append(centerText(title, 32)).append("\n");
+        receipt.append(centerText(title)).append("\n");
         receipt.append("ВРАБОТЕН: ").append(employeeName).append(" | МАСА: ").append(tableNumber).append("\n");
         receipt.append("ВРЕМЕ: ").append(java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm dd-MM-yyyy"))).append("\n");
         receipt.append("\n");
@@ -116,7 +116,7 @@ public class PrinterService {
         StringBuilder receipt = new StringBuilder();
 
         // Add title
-        receipt.append(centerText("СМЕТКА", 32)).append("\n");
+        receipt.append(centerText("СМЕТКА")).append("\n");
         receipt.append("--------------------------------\n");
 
         // Add articles
@@ -148,7 +148,7 @@ public class PrinterService {
         receipt.append("Вработен: ").append(employeeName).append("\n");
         receipt.append("Датум: ").append(java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm dd-MM-yyyy"))).append("\n");
         receipt.append("\n");
-        receipt.append(centerText("ПОВЕЛЕТЕ ПОВТОРНО!\n\n\n",32)).append("\n");
+        receipt.append(centerText("ПОВЕЛЕТЕ ПОВТОРНО!\n\n\n")).append("\n");
         receipt.append("\n");
         // Send the receipt to the printer
         return sendToPrinter(receipt.toString());
@@ -157,7 +157,7 @@ public class PrinterService {
         StringBuilder receipt = new StringBuilder();
 
         // Add title
-        receipt.append(centerText("СМЕТКА", 32)).append("\n");
+        receipt.append(centerText("СМЕТКА")).append("\n");
         receipt.append("--------------------------------\n");
 
         // Add articles
@@ -189,7 +189,7 @@ public class PrinterService {
         receipt.append("Вработен: ").append(employeeName).append("\n");
         receipt.append("Датум: ").append(datum).append(" ").append(vreme).append("\n");
         receipt.append("\n");
-        receipt.append(centerText("ПОВЕЛЕТЕ ПОВТОРНО!",32)).append("\n");
+        receipt.append(centerText("ПОВЕЛЕТЕ ПОВТОРНО!")).append("\n");
         receipt.append("\n");
         receipt.append("\n");
         // Send the receipt to the printer
@@ -241,80 +241,46 @@ public class PrinterService {
         // Format article line with aligned pricing
         return String.format("%s%s %2s x %4s |%5s", name, spacing, qty, price, total);
     }
-    private String centerText(String text, int width) {
-        int padSize = (width - text.length()) / 2;
+    private String centerText(String text) {
+        int padSize = (32 - text.length()) / 2;
         return " ".repeat(Math.max(0, padSize)) + text;
     }
 
-    private Boolean sendToPrinter(String receiptText) {
-        try {
-            // Find the thermal printer (e.g., Bixolon)
-            PrintService printService = findThermalPrinter();
-            if (printService == null) {
-                RestaurantApp.showAlert("Не е најден принтерот - bixolon");
-                return false;
-            }
-
-            // Open a raw print job
-            DocPrintJob job = printService.createPrintJob();
-            DocFlavor flavor = DocFlavor.BYTE_ARRAY.AUTOSENSE;
-            PrintRequestAttributeSet printAttributes = new HashPrintRequestAttributeSet();
-
-            // Set the code page for Cyrillic characters (CP866 encoding)
-            byte[] commandBytes = SET_CYRILLIC_CODE_PAGE;
-
-            // Convert the receipt text to byte array using CP866 encoding
-            byte[] receiptBytes = receiptText.getBytes("CP866");  // Use CP866 for Cyrillic text
-
-            // Combine commandBytes and receiptBytes
-            byte[] combinedBytes = new byte[commandBytes.length + receiptBytes.length];
-            System.arraycopy(commandBytes, 0, combinedBytes, 0, commandBytes.length);
-            System.arraycopy(receiptBytes, 0, combinedBytes, commandBytes.length, receiptBytes.length);
-
-            // Retry sending the job if the printer is busy
-            boolean jobSent = false;
-            int retries = 3;
-            while (retries > 0 && !jobSent) {
-                try {
-                    Doc doc = new SimpleDoc(combinedBytes, flavor, null);
-                    job.print(doc, printAttributes);
-                    jobSent = true; // Job successfully sent
-                } catch (PrintException e) {
-                    retries--;
-                    RestaurantApp.showAlert("Printer busy. Retrying... (" + retries + " retries left)");
-                    Thread.sleep(2000); // Wait for 2 seconds before retrying
-                }
-            }
-
-            if (!jobSent) {
-                clearPrintQueue();
-                resetPrinter(printService);
-                DocPrintJob cutJob = printService.createPrintJob();
-                Doc cutDoc = new SimpleDoc(CUT_PAPER, flavor, null);
-                cutJob.print(cutDoc, printAttributes); // Send cut paper command
-                return false;
-            }
-            DocPrintJob cutJob = printService.createPrintJob();
-            Doc cutDoc = new SimpleDoc(CUT_PAPER, flavor, null);
-            cutJob.print(cutDoc, printAttributes); // Send cut paper command
-            return true;
-        } catch (Exception e) {
-            clearPrintQueue();
-            RestaurantApp.showAlert("Грешка при испраќање до принтер: " + e.getMessage());
+private Boolean sendToPrinter(String receiptText) {
+    try {
+        // Find the thermal printer (e.g., Bixolon)
+        PrintService printService = findThermalPrinter();
+        if (printService == null) {
+            RestaurantApp.showAlert("Не е најден принтерот - bixolon");
             return false;
         }
+        // Open a raw print job
+        DocPrintJob job = printService.createPrintJob();
+        DocFlavor flavor = DocFlavor.BYTE_ARRAY.AUTOSENSE;
+        PrintRequestAttributeSet printAttributes = new HashPrintRequestAttributeSet();
+
+        // Set the code page for Cyrillic characters (CP866 encoding)
+        byte[] commandBytes = SET_CYRILLIC_CODE_PAGE;
+
+        // Convert the receipt text to byte array using CP866 encoding
+        byte[] receiptBytes = receiptText.getBytes("CP866"); // Use CP866 for Cyrillic text
+
+        // Combine commandBytes, receiptBytes, and CUT_PAPER
+        byte[] combinedBytes = new byte[commandBytes.length + receiptBytes.length + CUT_PAPER.length];
+        System.arraycopy(commandBytes, 0, combinedBytes, 0, commandBytes.length);
+        System.arraycopy(receiptBytes, 0, combinedBytes, commandBytes.length, receiptBytes.length);
+        System.arraycopy(CUT_PAPER, 0, combinedBytes, commandBytes.length + receiptBytes.length, CUT_PAPER.length);
+
+        // Send the combined data as a single print job
+        Doc doc = new SimpleDoc(combinedBytes, flavor, null);
+        job.print(doc, printAttributes);
+        return true;
+    } catch (Exception e) {
+        clearPrintQueue();
+        RestaurantApp.showAlert("Грешка при испраќање до принтер: " + e.getMessage());
+        return false;
     }
-    private void resetPrinter(PrintService printService) {
-        try {
-            DocPrintJob resetJob = printService.createPrintJob();
-            DocFlavor flavor = DocFlavor.BYTE_ARRAY.AUTOSENSE;
-            Doc resetDoc = new SimpleDoc(RESET_PRINTER, flavor, null);
-            resetJob.print(resetDoc, null);
-            RestaurantApp.showAlertInformation("Принтерот се рестартира усшено");
-        } catch (PrintException e) {
-            RestaurantApp.showAlert("Принтерот неможе да се рестартира");
-        }
-    }
+}
 
     public void clearPrintQueue() {
         try {
@@ -342,8 +308,6 @@ public class PrinterService {
             RestaurantApp.showAlert("Грешка при чистење на принтерот:\n" + e.getMessage());
         }
     }
-
-
 
     private PrintService findThermalPrinter() {
         PrintService[] services = PrintServiceLookup.lookupPrintServices(null, null);

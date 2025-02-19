@@ -117,7 +117,12 @@ public class Admin extends Application {
 
     static boolean checkAdmin(String proverka) {
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement("select tip from Vraboten where Shifra = ?"))
+             PreparedStatement stmt = conn.prepareStatement("""
+                     select tv.tip
+                     from vraboten as v
+                     inner join tipVraboten tV on v.tip = tV.ID
+                     where v.shifra = ?
+                     """))
         {
             String tip= "";
             stmt.setInt(1, Integer.parseInt(proverka));
@@ -282,7 +287,7 @@ public class Admin extends Application {
 
     private void loadVrabotenList() {
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement("select * from Vraboten"))
+             PreparedStatement stmt = conn.prepareStatement("select v.shifra,v.ime,tv.tip from Vraboten as v inner join tipvraboten as tv on v.tip = tv.id;"))
         {
             ResultSet rs = stmt.executeQuery();
 
@@ -327,13 +332,20 @@ public class Admin extends Application {
                 return;
             }
 
+            int tipID=2;
+            PreparedStatement gettip = conn.prepareStatement("select id from tipvraboten where tip = ?");
+            gettip.setString(1, tip_nov);
+            ResultSet rs1 = gettip.executeQuery();
+            if (rs1.next()) {
+                tipID = rs1.getInt("id");
+            }
             // Insert or update record
             PreparedStatement stmt = conn.prepareStatement("INSERT INTO Vraboten (shifra, ime, tip) VALUES (?, ?, ?) ON CONFLICT (shifra) DO UPDATE SET ime = ?, tip = ?");
             stmt.setInt(1, shifra);
             stmt.setString(2, ime_novo);
-            stmt.setString(3, tip_nov);
+            stmt.setInt(3, tipID);
             stmt.setString(4, ime_novo);
-            stmt.setString(5, tip_nov);
+            stmt.setInt(5, tipID);
             stmt.executeUpdate();
 
             showAlertInformation("Вработениот е зачуван успешно.");
@@ -419,10 +431,18 @@ public class Admin extends Application {
         }
 
         try (Connection conn = DatabaseConnection.getConnection()) {
+            PreparedStatement stmt1 = conn.prepareStatement("select id from tipvraboten where tip = ?");
+            stmt1.setString(1,tip_nov);
+            ResultSet rs = stmt1.executeQuery();
+            int tipID=0;
+            if (rs.next()) {
+                tipID = rs.getInt("id");
+            }
+
             PreparedStatement stmt = conn.prepareStatement("UPDATE Vraboten SET shifra = ?, ime = ?, tip = ? WHERE shifra = ?");
             stmt.setInt(1,shifra);
             stmt.setString(2, ime_novo);
-            stmt.setString(3, tip_nov);
+            stmt.setInt(3, tipID);
             stmt.setInt(4, Integer.parseInt(shifrapostoecka));
 
             int updatedRows = stmt.executeUpdate();
@@ -624,7 +644,11 @@ public class Admin extends Application {
     private void loadArticleTable(TableView<String[]> articleTable) {
         articleTable.getItems().clear();
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement("SELECT * FROM Artikl")) {
+             PreparedStatement stmt = conn.prepareStatement("""
+                    SELECT a.id,a.naziv,a.cena,a.ddv,ta.tip
+                    FROM Artikl as a
+                    inner join tipartikl as ta on a.tip = ta.id
+                    """)) {
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) {
                 String id = String.valueOf(rs.getInt("id"));
@@ -651,6 +675,10 @@ public class Admin extends Application {
         }
         int ddv = ddvComboBox.getValue();
         String tip = tipComboBox.getValue();
+        int tipA=1;
+        if(tip.trim().equals("kujna")){
+            tipA=2;
+        }
 
         if (naziv.isEmpty()) {
             showAlertInformation("Називот не може да биде празен.");
@@ -661,7 +689,7 @@ public class Admin extends Application {
             stmt.setString(1, naziv);
             stmt.setInt(2, cena);
             stmt.setInt(3, ddv);
-            stmt.setString(4, tip);
+            stmt.setInt(4, tipA);
             stmt.executeUpdate();
             showAlertInformation("Артиклот е зачуван успешно.");
             loadArticleTable(articleTable);
@@ -687,6 +715,10 @@ public class Admin extends Application {
         }
         int ddv = ddvComboBox.getValue();
         String tip = tipComboBox.getValue();
+        int tipA = 1;
+        if(tip.trim().equals("kujna")){
+            tipA=2;
+        }
 
         if (naziv.isEmpty()) {
             showAlertError("Називот не може да биде празен.");
@@ -697,7 +729,7 @@ public class Admin extends Application {
             stmt.setString(1, naziv);
             stmt.setInt(2, cena);
             stmt.setInt(3, ddv);
-            stmt.setString(4, tip);
+            stmt.setInt(4, tipA);
             stmt.setInt(5, Integer.parseInt(id));
             stmt.executeUpdate();
             showAlertInformation("Артиклот е променет успешно.");
