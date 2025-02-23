@@ -64,6 +64,12 @@
             <version>1.4.12</version> <!-- Recommended Logback version for SLF4J 1.x -->
         </dependency>
 
+        <dependency>
+            <groupId>com.fazecast</groupId>
+            <artifactId>jSerialComm</artifactId>
+            <version>2.9.3</version>
+        </dependency>
+
     </dependencies>
 
     <build>
