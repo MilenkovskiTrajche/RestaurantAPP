@@ -166,7 +166,7 @@ public class RestaurantApp extends Application {
 
         // Create Scene and Stage
         Scene scene = new Scene(mainLayout);
-        primaryStage.setTitle("Папараци2");
+        primaryStage.setTitle("RestaurantAPP");
         primaryStage.setScene(scene);
         primaryStage.setMaximized(true);
         primaryStage.show();
@@ -1968,7 +1968,7 @@ public class RestaurantApp extends Application {
         double btnwidth = screenWidth * 0.70;
 
         newTableButton.setPrefSize(btnwidth/6, screenHeight * 0.06);// Set size for the new table button
-        newTableButton.styleProperty().bind(Bindings.concat("-fx-border-color: black;-fx-font-size: ", screenWidth / 60, "px;"));
+        newTableButton.styleProperty().bind(Bindings.concat("-fx-border-color: black;-fx-font-size: ", screenWidth / 70, "px;"));
         String username = ime;
         String btnname=username+":"+tableNumber;
         newTableButton.setText(username + ":" + tableNumber);
